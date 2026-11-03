@@ -22,9 +22,9 @@ export function nextStar(best) {
 
 export function ballSpec(type) {
   if (type === "iron") {
-    return { r: 10, catchBonus: 110, grav: 760, rest: 0.42, name: "鉄球" };
+    return { r: 10, catchBonus: 160, grav: 700, rest: 0.34, name: "鉄球" };
   }
-  return { r: 9, catchBonus: 0, grav: 620, rest: 0.74, name: "ガラス玉" };
+  return { r: 9, catchBonus: 0, grav: 540, rest: 0.46, name: "ガラス玉" };
 }
 
 function makeRng(seed) {
@@ -52,7 +52,7 @@ export function railPoint(s) {
 export function zoneInfo(x) {
   if (x >= 430) return { zone: "右の安定穴", hint: "入りやすい。払い出し5", tone: "safe" };
   if (x >= 340) return { zone: "右の中穴", hint: "払い出し8。役物・右の筋", tone: "mid" };
-  if (x >= 255) return { zone: "中央の大穴", hint: "速いと跳ねる。払い出し15", tone: "big" };
+  if (x >= 255) return { zone: "中央の大穴", hint: "払い出し15。落ちると大きい", tone: "big" };
   if (x >= 200) return { zone: "チャッカー筋", hint: "通すと役物が開く", tone: "mid" };
   if (x >= 120) return { zone: "左の中穴", hint: "役物・左の筋", tone: "mid" };
   return { zone: "左サイド", hint: "壁に当たりやすい", tone: "left" };
@@ -66,17 +66,17 @@ export function aimFor(power) {
 
 function makePockets() {
   return [
-    { id: "safe", name: "安定穴", x: 470, y: 250, r: 16, payout: 5, type: "normal", catch: 440, label: "5" },
-    { id: "left5", name: "左穴", x: 96, y: 268, r: 15, payout: 5, type: "normal", catch: 250, label: "5" },
-    { id: "big", name: "中央大穴", x: 274, y: 392, r: 18, payout: 15, type: "big", catch: 168, label: "15" },
-    { id: "midR", name: "右中穴", x: 392, y: 470, r: 15, payout: 8, type: "normal", catch: 250, label: "8" },
-    { id: "midL", name: "左中穴", x: 168, y: 470, r: 15, payout: 8, type: "normal", catch: 240, label: "8" },
-    { id: "renL", name: "連勝穴・左", x: 214, y: 560, r: 15, payout: 16, type: "rensho", pair: "ren", catch: 260, label: "連" },
-    { id: "renR", name: "連勝穴・右", x: 334, y: 560, r: 15, payout: 16, type: "rensho", pair: "ren", catch: 260, label: "連" },
-    { id: "yL", name: "役物・左", x: 88, y: 668, r: 19, payout: 15, type: "yakumono", catch: 520, label: "15", open: false, openAnim: 0 },
-    { id: "yC", name: "役物・中", x: 300, y: 730, r: 20, payout: 15, type: "yakumono", catch: 520, label: "15", open: false, openAnim: 0 },
-    { id: "yR", name: "役物・右", x: 398, y: 648, r: 19, payout: 15, type: "yakumono", catch: 500, label: "15", open: false, openAnim: 0 },
-    { id: "last", name: "スレスレ穴", x: 274, y: 792, r: 14, payout: 5, type: "normal", catch: 340, label: "5" },
+    { id: "safe", name: "安定穴", x: 470, y: 250, r: 20, payout: 5, type: "normal", catch: 980, label: "5" },
+    { id: "left5", name: "左穴", x: 96, y: 268, r: 18, payout: 5, type: "normal", catch: 780, label: "5" },
+    { id: "big", name: "中央大穴", x: 274, y: 392, r: 24, payout: 15, type: "big", catch: 640, label: "15" },
+    { id: "midR", name: "右中穴", x: 392, y: 470, r: 18, payout: 8, type: "normal", catch: 780, label: "8" },
+    { id: "midL", name: "左中穴", x: 168, y: 470, r: 18, payout: 8, type: "normal", catch: 760, label: "8" },
+    { id: "renL", name: "連勝穴・左", x: 214, y: 560, r: 18, payout: 16, type: "rensho", pair: "ren", catch: 740, label: "連" },
+    { id: "renR", name: "連勝穴・右", x: 334, y: 560, r: 18, payout: 16, type: "rensho", pair: "ren", catch: 740, label: "連" },
+    { id: "yL", name: "役物・左", x: 88, y: 668, r: 22, payout: 15, type: "yakumono", catch: 980, label: "15", open: false, openAnim: 0 },
+    { id: "yC", name: "役物・中", x: 300, y: 730, r: 24, payout: 15, type: "yakumono", catch: 1000, label: "15", open: false, openAnim: 0 },
+    { id: "yR", name: "役物・右", x: 398, y: 648, r: 22, payout: 15, type: "yakumono", catch: 960, label: "15", open: false, openAnim: 0 },
+    { id: "last", name: "スレスレ穴", x: 274, y: 792, r: 17, payout: 5, type: "normal", catch: 880, label: "5" },
     { id: "chucker", name: "スタートチャッカー", x: 242, y: 168, r: 16, payout: 1, type: "chucker", label: "S" },
   ];
 }
@@ -129,11 +129,11 @@ function makePins(pockets) {
   add(486, 196, 5, true);
   add(448, 214, 4.6, true);
 
-  // 中央大穴の唇。正面に狭い入口だけ残す。
-  add(246, 340, 5.4, true);
-  add(302, 340, 5.4, true);
-  add(236, 428, 5, true);
-  add(312, 428, 5, true);
+  // 中央大穴の袖。入口は広く、遅い玉は落ちる。
+  add(228, 332, 5.2, true);
+  add(320, 332, 5.2, true);
+  add(220, 436, 5, true);
+  add(328, 436, 5, true);
 
   // チャッカーの袖
   add(214, 150, 4.8, true);
@@ -657,7 +657,7 @@ function resolvePlay(state, dt) {
     const ny = dy / d;
     b.cd = 0.16;
     b.flash = 0.28;
-    const kick = 340 + state.rand() * 40;
+    const kick = 240 + state.rand() * 36;
     ball.x = b.x + nx * (min + 0.5);
     ball.y = b.y + ny * (min + 0.5);
     ball.vx = nx * kick;
@@ -697,27 +697,33 @@ function resolvePlay(state, dt) {
     if (p.type === "chucker") continue;
     if (p.type === "yakumono" && !p.open) continue;
     const d = Math.hypot(ball.x - p.x, ball.y - p.y);
-    const reach = p.r - 1;
-    if (d > reach) continue;
+    const mouth = p.r + r * 0.72;
+    if (d > mouth) continue;
     if (ball.skipId === p.id && ball.skipT > 0) {
-      pushOut(ball, p, 0.5);
+      pushOut(ball, p, 0.35);
       continue;
     }
     if (p.type === "rensho" && p.held) {
-      pushOut(ball, p, 0.45);
+      pushOut(ball, p, 0.4);
       continue;
     }
     const speed = Math.hypot(ball.vx, ball.vy);
     const catchV = (p.catch ?? 320) + ball.catchBonus;
-    const swallow = speed <= catchV;
-    if (swallow) {
+    const nx = (p.x - ball.x) / Math.max(d, 1);
+    const ny = (p.y - ball.y) / Math.max(d, 1);
+    if (speed <= catchV && d <= p.r + r * 0.5) {
       capture(state, p);
       return;
     }
-    pushOut(ball, p, 0.62);
-    ball.skipId = p.id;
-    ball.skipT = 0.22;
-    if (speed < catchV * 1.45) {
+    if (speed <= catchV * 1.2) {
+      ball.vx = ball.vx * 0.72 + nx * 140;
+      ball.vy = ball.vy * 0.72 + ny * 140;
+      continue;
+    }
+    if (d <= p.r + r * 0.05) {
+      pushOut(ball, p, 0.42);
+      ball.skipId = p.id;
+      ball.skipT = 0.16;
       push(state, { type: "nearmiss", x: p.x, y: p.y, id: p.id });
     }
   }

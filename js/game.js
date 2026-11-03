@@ -10,7 +10,7 @@ import {
   starCount,
   step,
 } from "./sim.js";
-import { render } from "./render.js";
+import { GAZE, HOPPER, render, renderGaze, renderHopper } from "./render.js";
 
 const SAVE_KEY = "smartball-yokomon-v1";
 
@@ -46,9 +46,11 @@ function rewardText(reward) {
 }
 
 export class Game {
-  constructor({ canvas, audio, els }) {
+  constructor({ canvas, hopper, audio, els }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
+    this.hopper = hopper;
+    this.hopperCtx = hopper.getContext("2d");
     this.audio = audio;
     this.els = els;
     this.state = createState();
@@ -65,6 +67,23 @@ export class Game {
     this.ironUnlocked = false;
     this.coachSeen = false;
     this.spillWarned = false;
+    this.showcase = {
+      loose: 0,
+      boxed: 0,
+      type: "glass",
+      looseFallN: 0,
+      looseFallAt: 0,
+      boxedFallN: 0,
+      boxedFallAt: 0,
+      tiltX: 0,
+      tiltY: 0,
+    };
+    this.gazeCanvas = null;
+    this.gazeCtx = null;
+    this.gazeTiltX = 0;
+    this.gazeTiltY = 0;
+    this.gazeDrag = false;
+    this._scReady = false;
     this.missionDirty = true;
     this.keyHold = false;
     this.acc = 0;
@@ -77,9 +96,73 @@ export class Game {
 
   resize() {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = dpr;
     this.canvas.width = Math.round(VIEW.w * dpr);
     this.canvas.height = Math.round(VIEW.h * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.hopper.width = Math.round(HOPPER.w * dpr);
+    this.hopper.height = Math.round(HOPPER.h * dpr);
+    this.hopperCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (this.gazeCanvas && this.gazeCtx) {
+      this.gazeCanvas.width = Math.round(GAZE.w * dpr);
+      this.gazeCanvas.height = Math.round(GAZE.h * dpr);
+      this.gazeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }
+
+  attachGaze(canvas) {
+    this.gazeCanvas = canvas;
+    this.gazeCtx = canvas.getContext("2d");
+    this.gazeTiltX = 0;
+    this.gazeTiltY = 0;
+    this.gazeDrag = false;
+    this.resize();
+  }
+
+  detachGaze() {
+    this.gazeCanvas = null;
+    this.gazeCtx = null;
+    this.gazeDrag = false;
+    this.gazeTiltX = 0;
+    this.gazeTiltY = 0;
+  }
+
+  tickShowcase(now) {
+    const loose = Math.max(0, this.state.stock - this.state.boxedAt);
+    const boxed = Math.max(0, Math.min(this.state.stock, this.state.boxedAt));
+    const sc = this.showcase;
+    if (!this._scReady) {
+      this._scReady = true;
+    } else {
+      const dL = loose - sc.loose;
+      const dB = boxed - sc.boxed;
+      if (dL > 0) {
+        sc.looseFallN = Math.min(48, dL);
+        sc.looseFallAt = now;
+      } else if (dL < 0) {
+        sc.looseFallN = 0;
+      }
+      if (dB > 0) {
+        sc.boxedFallN = Math.min(48, dB);
+        sc.boxedFallAt = now;
+      } else if (dB < 0) {
+        sc.boxedFallN = 0;
+      }
+    }
+    sc.loose = loose;
+    sc.boxed = boxed;
+    sc.type = this.state.ballType;
+    if (this.gazeCtx && !this.gazeDrag) {
+      this.gazeTiltX *= 0.9;
+      this.gazeTiltY *= 0.9;
+    }
+    const sway = this.gazeCtx && !this.gazeDrag ? Math.sin(now / 1000 * 0.75) * 0.22 : 0;
+    const tx = (this.gazeCtx ? this.gazeTiltX : 0) + sway;
+    const ty = this.gazeCtx ? this.gazeTiltY : 0;
+    sc.tiltX += (tx - sc.tiltX) * 0.18;
+    sc.tiltY += (ty - sc.tiltY) * 0.18;
+    sc.looseFallAge = sc.looseFallAt ? (now - sc.looseFallAt) / 1000 : 99;
+    sc.boxedFallAge = sc.boxedFallAt ? (now - sc.boxedFallAt) / 1000 : 99;
   }
 
   load() {
@@ -173,7 +256,10 @@ export class Game {
         if (this.speechT > 0) this.speechT -= dt;
       }
       this.updateFx(dt);
+      this.tickShowcase(t);
       render(this.ctx, this.state, this.fx, t / 1000);
+      renderHopper(this.hopperCtx, this.showcase, t / 1000);
+      if (this.gazeCtx) renderGaze(this.gazeCtx, this.showcase, t / 1000);
       this.sync();
       requestAnimationFrame(loop);
     };
@@ -468,7 +554,7 @@ export class Game {
       giveBalls(this.state, 1);
       this.say("箱にしまった。底に玉がひとつ残っていた。");
     } else {
-      this.say("箱にしまった。盤面がよく見える。");
+      this.say("箱にしまった。窓ごしに、玉を眺められる。");
     }
   }
 
@@ -651,9 +737,14 @@ export class Game {
     els.iron.title = this.ironUnlocked ? "重くて穴に落ちやすい" : `入賞${this.lifetime.pockets}/25で解禁`;
     els.guide.checked = s.guide !== false;
     const spill = s.stock - s.boxedAt;
-    if (spill >= 48 && !this.spillWarned) {
+    const gazeCount = document.getElementById("gaze-count");
+    if (gazeCount) {
+      const kind = s.ballType === "iron" ? "鉄球" : "ガラス玉";
+      gazeCount.textContent = `受け皿 ${spill}、箱 ${Math.min(s.boxedAt, s.stock)}。あわせて ${s.stock} の${kind}。皿をドラッグすると、山を傾けて見られる。`;
+    }
+    if (spill >= 80 && !this.spillWarned) {
       this.spillWarned = true;
-      this.say("ガラスの上に玉が積もった。箱にしまうと、盤面がよく見える。");
+      this.say("受け皿が山になった。箱にしまうと、箱の窓から眺められる。");
     }
     if (spill < 8) this.spillWarned = false;
     if (this.missionDirty) {
