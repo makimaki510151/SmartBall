@@ -11,30 +11,9 @@ import {
 } from "./sim.js";
 import { GAZE, HOPPER, render, renderGaze, renderHopper } from "./render.js";
 import { createTray, stepTray, syncTray } from "./tray.js";
+import { LINES, costAt } from "./story.js";
 
 const SAVE_KEY = "smartball-yokomon-v1";
-
-export const PRIZES = [
-  { id: "bidama", name: "ビー玉", cost: 15, sell: 40, blurb: "掌で鳴る、小さいガラス玉。", hue: 200 },
-  { id: "ramune", name: "ラムネ", cost: 25, sell: 55, blurb: "ビー玉のころがる音がする瓶。", hue: 188 },
-  { id: "kamifu", name: "紙風船", cost: 35, sell: 60, blurb: "息を入れると、丸く膨らむ。", hue: 12 },
-  { id: "kinako", name: "きなこ棒", cost: 45, sell: 75, blurb: "甘くて素朴な縁日の定番。", hue: 36 },
-  { id: "ringo", name: "りんご飴", cost: 55, sell: 85, blurb: "赤くて、棒の先で光る。", hue: 0 },
-  { id: "ohajiki", name: "おはじき", cost: 70, sell: 100, blurb: "光るガラスが七つ。", hue: 276 },
-  { id: "omen", name: "お面", cost: 85, sell: 115, blurb: "狐の面。ゴムが少し緩い。", hue: 28 },
-  { id: "dagashi", name: "駄菓子袋", cost: 100, sell: 130, blurb: "店主が奥から出してくれる袋。", hue: 8 },
-  { id: "yoyo", name: "水ヨーヨー", cost: 120, sell: 150, blurb: "ゴムの先で、ぷるぷる揺れる。", hue: 168 },
-  { id: "hanabi", name: "手持ち花火", cost: 145, sell: 175, blurb: "夜店の匂いがしそうだ。", hue: 4 },
-  { id: "kuji", name: "くじ引き", cost: 170, sell: 200, blurb: "折りたたんだ短冊が、まだ入っている。", hue: 330 },
-  { id: "kingyo", name: "金魚", cost: 200, sell: 230, blurb: "ぽうっと泳ぐ赤い一匹。", hue: 350 },
-  { id: "chochin", name: "提灯", cost: 240, sell: 270, blurb: "屋号が、墨で書いてある。", hue: 48 },
-  { id: "maneki", name: "招き猫", cost: 290, sell: 320, blurb: "左手をあげて、次の出玉を招く。", hue: 42 },
-  { id: "shateki", name: "射的のコルク銃", cost: 340, sell: 370, blurb: "コルクの玉が、三発残っている。", hue: 96 },
-  { id: "tsuten", name: "通天閣の根付", cost: 400, sell: 440, blurb: "新世界のネオンを小さく閉じ込めた。", hue: 262 },
-  { id: "noren", name: "縁日の暖簾", cost: 480, sell: 500, blurb: "藍の縞が、風で揺れる。", hue: 220 },
-  { id: "trophy", name: "横モノの杯", cost: 580, sell: 580, blurb: "長く台に座った人だけの杯。", hue: 46 },
-  { id: "tenugui", name: "店主の手ぬぐい", cost: 760, sell: 700, blurb: "店の名が、端に縫ってある。", hue: 140 },
-];
 
 const MISSION_POOL = [
   { key: "pockets", text: "入賞を8回させる", goal: 8, reward: { balls: 18 } },
@@ -68,8 +47,7 @@ export class Game {
     this.paused = false;
     this.missions = [];
     this.lifetime = { pockets: 0, launches: 0, rensho: 0, fever: 0, clears: 0 };
-    this.collection = {};
-    this.discovered = {};
+    this.storyRead = 0;
     this.shownStock = 0;
     this.speechT = 6;
     this.speech = "100円入れると、玉が25個おりてくる。";
@@ -181,8 +159,9 @@ export class Game {
       if (Number.isFinite(data.yen)) this.state.yen = data.yen;
       if (Number.isFinite(data.bestStock)) this.state.bestStock = data.bestStock;
       if (data.lifetime) this.lifetime = { ...this.lifetime, ...data.lifetime };
-      if (data.collection) this.collection = data.collection;
-      if (data.discovered) this.discovered = data.discovered;
+      if (Number.isFinite(data.storyRead)) {
+        this.storyRead = Math.max(0, Math.min(LINES.length, Math.floor(data.storyRead)));
+      }
       if (data.ballType === "iron" || data.ballType === "glass") this.state.ballType = data.ballType;
       if (typeof data.guide === "boolean") this.state.guide = data.guide;
       this.ironUnlocked = !!data.ironUnlocked || this.lifetime.pockets >= 25;
@@ -206,8 +185,7 @@ export class Game {
         yen: this.state.yen,
         bestStock: this.state.bestStock,
         lifetime: this.lifetime,
-        collection: this.collection,
-        discovered: this.discovered,
+        storyRead: this.storyRead,
         ballType: this.state.ballType,
         guide: this.state.guide,
         ironUnlocked: this.ironUnlocked,
@@ -542,7 +520,7 @@ export class Game {
   coin() {
     this.audio.unlock();
     if (this.state.yen < 100) {
-      this.say("100円たりない。景品をコインに戻すか、店主を頼って。");
+      this.say("100円たりない。店主を頼ってみよう。");
       return false;
     }
     insertCoin(this.state);
@@ -608,36 +586,25 @@ export class Game {
     this.save();
   }
 
-  exchange(id) {
-    const prize = PRIZES.find((p) => p.id === id);
-    if (!prize) return;
-    if (this.state.stock < prize.cost) {
-      this.say(`まだ${prize.cost - this.state.stock}球たりない。`);
-      return;
+  readNext() {
+    const i = this.storyRead;
+    if (i >= LINES.length) return null;
+    const cost = costAt(i);
+    if (this.state.stock < cost) {
+      this.say(`まだ${cost - this.state.stock}球たりない。`);
+      return null;
     }
-    this.state.stock -= prize.cost;
+    this.state.stock -= cost;
+    if (this.state.boxedAt > this.state.stock) this.state.boxedAt = this.state.stock;
     if (this.state.stock === 0 && (this.state.phase === "ready" || this.state.phase === "attract")) {
       this.state.phase = "empty";
     }
-    this.collection[id] = (this.collection[id] || 0) + 1;
-    const first = !this.discovered[id];
-    this.discovered[id] = true;
+    this.storyRead += 1;
     this.audio.unlock();
-    this.audio.play("prize");
-    this.fx.flash = 0.45;
-    this.burst(300, 300, `hsl(${prize.hue} 90% 62%)`, 30, 220);
-    this.say(first ? `${prize.name}を、はじめて手に入れた。` : `${prize.name}を、もう一つ交換した。`);
+    this.audio.play("ui");
+    this.say(LINES[i], 7);
     this.save();
-  }
-
-  sell(id) {
-    const prize = PRIZES.find((p) => p.id === id);
-    if (!prize || !(this.collection[id] > 0)) return;
-    this.collection[id] -= 1;
-    this.state.yen = Math.min(999999, this.state.yen + prize.sell);
-    this.audio.play("coin");
-    this.say(`${prize.name}を${prize.sell}円にした。また玉が買える。`);
-    this.save();
+    return LINES[i];
   }
 
   markCoach() {

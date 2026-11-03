@@ -447,27 +447,27 @@ footer p { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: elli
 .sheet li { margin: 0.4rem 0; }
 .sheet button { margin-top: 8px; }
 
-.prize-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
-.prize {
-  padding: 10px;
+.sheet.story-sheet {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.story-meta { margin: 0 0 8px; font-size: 0.86rem; }
+.story-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(52vh, 480px);
+  overflow: auto;
+  margin: 0 0 8px;
+  padding: 10px 12px;
   background: #fffaf0;
   border: 2px solid var(--ink);
+  font-family: "Shippori Mincho", "Yu Mincho", serif;
+  line-height: 1.75;
 }
-.prize h3 { margin: 6px 0 4px; font-size: 1rem; }
-.prize p { margin: 0 0 8px; font-size: 0.86rem; }
-.prize button { display: block; width: 100%; margin-top: 6px; }
-.medal {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  color: var(--paper);
-  font-weight: 700;
-  background: hsl(var(--h) 42% 36%);
-  border: 2px solid var(--ink);
-}
-.prize.locked { opacity: 0.72; }
-.own { color: #6a3018; font-weight: 700; }
+.story-log p { margin: 0 0 0.45em; }
+.story-empty { color: #6a5344; }
+.sheet.story-sheet button { margin-top: 8px; }
 
 .fly {
   position: fixed;
