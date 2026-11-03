@@ -4,7 +4,7 @@ export function createTray(kind) {
   if (kind === "box") {
     return { w: 112, h: 120, r: 9.2, bowl: 16, cap: 72, balls: [] };
   }
-  return { w: 260, h: 120, r: 11.2, bowl: 70, cap: 96, balls: [] };
+  return { w: 660, h: 210, r: 10.4, bowl: 78, cap: 220, balls: [] };
 }
 
 function floorY(world, x) {
@@ -239,6 +239,22 @@ function runSelfTest() {
   console.log("box spread", piled.spread.toFixed(1), "fast", piled.fast, "above", piled.above);
   if (piled.spread < box.r * 3 || piled.above || piled.outside || piled.fast > 2) {
     console.error("box did not stack");
+    process.exitCode = 1;
+  }
+  const full = createTray("dish");
+  syncTray(full, full.cap);
+  for (let i = 0; i < 900; i += 1) stepTray(full, 1 / 60);
+  const heap = measure(full);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const ball of full.balls) {
+    minX = Math.min(minX, ball.x);
+    maxX = Math.max(maxX, ball.x);
+  }
+  const span = maxX - minX;
+  console.log("heap", full.balls.length, "span", span.toFixed(1), "spread", heap.spread.toFixed(1), "above", heap.above, "out", heap.outside, "fast", heap.fast, "minY", heap.minY.toFixed(1));
+  if (heap.above || heap.outside || heap.fast > 4 || span < full.w * 0.55) {
+    console.error("large pile does not fill the dish");
     process.exitCode = 1;
   }
 }
