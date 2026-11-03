@@ -45,7 +45,6 @@ const game = new Game({
     box: $("box"),
     glass: $("ball-glass"),
     iron: $("ball-iron"),
-    guide: $("guide"),
     missions: $("missions"),
   },
 });
@@ -131,7 +130,6 @@ $("plead").addEventListener("click", () => game.plead());
 $("reroll").addEventListener("click", () => game.reroll());
 $("ball-glass").addEventListener("click", () => game.setBall("glass"));
 $("ball-iron").addEventListener("click", () => game.setBall("iron"));
-$("guide").addEventListener("change", (event) => game.setGuide(event.target.checked));
 
 function bindSlider(id, apply) {
   const input = $(id);
@@ -191,11 +189,11 @@ function helpHtml(first) {
     <h2>横モノのスマートボール</h2>
     <ol>
       <li>「100円投入」で玉が25個、盤面の下の受け皿に落ちてくる。受け皿を押すと、近くで眺められる。</li>
-      <li>右の赤いレバーを下に引いて離す。強く引くほど、玉は左のほうへ落ちる。</li>
+      <li>盤面の右にある赤いレバーを、下へ引いてから指を離す。引くほど強く、玉は左のほうへ落ちる。スペースキーの長押しでも同じ。</li>
       <li>穴は落ちやすくしてある。右の安定穴は5球、中央の大穴は15球。</li>
       <li>Sのチャッカーを通すと、下の役物が開く。開いた穴に入ると15球。入った口は閉じる。</li>
       <li>「連」の穴は、左右そろってはじめて払い出される。</li>
-      <li>受け皿が山になったら「箱にしまう」。箱の窓からも玉が見える。20球から、縁日の景品と交換できる。</li>
+      <li>受け皿が山になったら「箱にしまう」。箱の窓からも玉が見える。15球から、縁日の景品と交換できる。</li>
     </ol>
     <p>同じ力で打てるように、ゲージの白線が前回の強さを覚えている。スペースキーの長押しでもレバーになる。</p>
     <p class="note">これは現金の動かないおもちゃです。景品はブラウザの中のコレクションで、実物とは交換できません。</p>
@@ -222,7 +220,7 @@ function openPrizes(mode) {
   const title = mode === "book" ? "景品図鑑" : "景品交換";
   const lead = mode === "book"
     ? "はじめて交換した景品が、ここに残る。"
-    : `いまの持ち玉は ${game.state.stock}。20球からラムネと交換できる。コインに戻すと、また玉が買える。`;
+    : `いまの持ち玉は ${game.state.stock}。15球からビー玉と交換できる。コインに戻すと、また玉が買える。`;
   openModal(mode, `
     <p class="eyebrow">縁日のカウンター</p>
     <h2>${title}</h2>

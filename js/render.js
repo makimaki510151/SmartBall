@@ -1,4 +1,4 @@
-import { FIELD, LANE_CX, RAIL_Y, VIEW, aimFor, railPoint } from "./sim.js";
+import { FIELD, LANE_CX, VIEW, railPoint } from "./sim.js";
 
 const JP = '"BIZ UDPGothic", "WenQuanYi Micro Hei", "Droid Sans Fallback", "Yu Gothic", sans-serif';
 
@@ -169,35 +169,25 @@ function drawBumper(ctx, b, time) {
   ctx.restore();
 }
 
-function drawGuide(ctx, state) {
-  if (state.guide === false || state.powerPreview < 0.12) return;
-  const aim = aimFor(state.powerPreview);
-  ctx.save();
-  ctx.strokeStyle = "rgba(255, 214, 90, 0.85)";
-  ctx.fillStyle = "rgba(255, 196, 60, 0.16)";
-  ctx.lineWidth = 2;
+function traceRail(ctx, lift) {
+  const n = 36;
   ctx.beginPath();
-  ctx.moveTo(aim.x, RAIL_Y);
-  ctx.lineTo(aim.x - 26, FIELD.t + 70);
-  ctx.lineTo(aim.x + 26, FIELD.t + 70);
-  ctx.closePath();
-  ctx.fill();
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(aim.x, RAIL_Y);
-  ctx.lineTo(aim.x, FIELD.t + 120);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
+  for (let i = 0; i <= n; i += 1) {
+    const p = railPoint(i / n);
+    const y = p.y - lift;
+    if (i === 0) ctx.moveTo(p.x, y);
+    else ctx.lineTo(p.x, y);
+  }
 }
 
-function drawLane(ctx, state) {
+function drawLane(ctx, state, time) {
+  const join = railPoint(0);
   ctx.save();
   ctx.fillStyle = "#3a2118";
-  ctx.fillRect(534, 78, 112, 760);
+  ctx.fillRect(534, join.y - 6, 112, 836 - (join.y - 6));
   ctx.strokeStyle = "#16110e";
   ctx.lineWidth = 3;
-  ctx.strokeRect(534, 78, 112, 760);
+  ctx.strokeRect(534, join.y - 6, 112, 836 - (join.y - 6));
 
   const pull = state.powerPreview || 0;
   const gaugeH = 210;
@@ -224,31 +214,50 @@ function drawLane(ctx, state) {
     ctx.stroke();
   }
 
-  const knobY = 790 + pull * 64;
-  const springTop = 700 + pull * 64;
+  const knobY = 748 + pull * 52;
+  const springTop = 668 + pull * 52;
   ctx.strokeStyle = "#d7d7df";
   ctx.lineWidth = 3;
   ctx.beginPath();
-  const coils = 8;
+  const coils = 7;
   for (let i = 0; i <= coils * 2; i += 1) {
     const t = i / (coils * 2);
-    const y = springTop + (knobY - 28 - springTop) * t;
+    const y = springTop + (knobY - 36 - springTop) * t;
     const x = i === 0 || i === coils * 2 ? LANE_CX : LANE_CX + (i % 2 === 0 ? -12 : 12);
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
   ctx.stroke();
 
-  ctx.fillStyle = "#9d1c24";
+  const charged = pull > 0.08;
+  ctx.fillStyle = "#f4ead6";
+  ctx.fillRect(540, 612, 100, 42);
   ctx.strokeStyle = "#16110e";
   ctx.lineWidth = 2;
-  ctx.fillRect(LANE_CX - 26, knobY - 18, 52, 44);
-  ctx.strokeRect(LANE_CX - 26, knobY - 18, 52, 44);
-  ctx.fillStyle = "#fff";
-  ctx.font = `700 14px ${JP}`;
+  ctx.strokeRect(540, 612, 100, 42);
+  ctx.fillStyle = "#16110e";
+  ctx.font = `700 16px ${JP}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("引く", LANE_CX, knobY + 4);
+  ctx.fillText(charged ? "離すと打つ" : "下へ引く", LANE_CX, 626);
+  ctx.font = `700 13px ${JP}`;
+  ctx.fillText(charged ? "指を離す" : "離すと玉が出る", LANE_CX, 644);
+
+  const bob = !charged && (state.phase === "ready" || state.phase === "attract") ? Math.sin(time * 5) * 5 : 0;
+  ctx.fillStyle = "#9d1c24";
+  ctx.strokeStyle = "#16110e";
+  ctx.lineWidth = 3;
+  ctx.fillRect(LANE_CX - 40, knobY - 8 + bob, 80, 62);
+  ctx.strokeRect(LANE_CX - 40, knobY - 8 + bob, 80, 62);
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.moveTo(LANE_CX, knobY + 36 + bob);
+  ctx.lineTo(LANE_CX - 16, knobY + 14 + bob);
+  ctx.lineTo(LANE_CX + 16, knobY + 14 + bob);
+  ctx.closePath();
+  ctx.fill();
+  ctx.font = `700 18px ${JP}`;
+  ctx.fillText(charged ? "離す" : "引く", LANE_CX, knobY + 8 + bob);
 
   const resting = state.phase === "ready" || state.phase === "attract";
   if (resting) {
@@ -260,25 +269,39 @@ function drawLane(ctx, state) {
 
 function drawRail(ctx, time) {
   ctx.save();
+  ctx.fillStyle = "#f3e0b4";
+  ctx.beginPath();
+  ctx.moveTo(FIELD.l, FIELD.t);
+  const n = 36;
+  for (let i = n; i >= 0; i -= 1) {
+    const p = railPoint(i / n);
+    if (p.x < FIELD.l || p.x > FIELD.r) continue;
+    ctx.lineTo(p.x, p.y);
+  }
+  ctx.lineTo(FIELD.r, FIELD.t);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "#16110e";
+  ctx.lineWidth = 16;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  traceRail(ctx, 0);
+  ctx.stroke();
   ctx.strokeStyle = "#b8893d";
   ctx.lineWidth = 10;
-  ctx.lineCap = "butt";
-  ctx.beginPath();
-  ctx.moveTo(48, RAIL_Y);
-  ctx.lineTo(LANE_CX, RAIL_Y);
+  traceRail(ctx, 0);
   ctx.stroke();
   ctx.strokeStyle = "#ffe7a8";
   ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(48, RAIL_Y - 3);
-  ctx.lineTo(LANE_CX, RAIL_Y - 3);
+  traceRail(ctx, 3);
   ctx.stroke();
-  for (let i = 0; i < 14; i += 1) {
-    const x = 70 + i * 36;
+  for (let i = 0; i <= 16; i += 1) {
+    const p = railPoint(i / 16);
     const on = Math.floor(time * 8 + i) % 4 === 0;
     ctx.fillStyle = on ? "#fff1b0" : "#8c5a22";
     ctx.beginPath();
-    ctx.arc(x, RAIL_Y, 3.2, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -446,7 +469,7 @@ export function render(ctx, state, fx, time) {
   if (shake > 0.3) ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
 
   ctx.fillStyle = "#f3e0b4";
-  ctx.fillRect(18, 28, FIELD.r - 18 + 8, FIELD.b - 18);
+  ctx.fillRect(FIELD.l, FIELD.t, FIELD.r - FIELD.l, FIELD.b - FIELD.t);
 
   ctx.save();
   ctx.beginPath();
@@ -474,7 +497,6 @@ export function render(ctx, state, fx, time) {
     ctx.fillRect(FIELD.l, FIELD.t, FIELD.r - FIELD.l, FIELD.b - FIELD.t);
   }
 
-  drawGuide(ctx, state);
   drawPins(ctx, state.pins);
   for (const b of state.bumpers) drawBumper(ctx, b, time);
   for (const p of state.pockets) drawPocket(ctx, p, state, time);
@@ -512,7 +534,12 @@ export function render(ctx, state, fx, time) {
 
   ctx.lineWidth = 4;
   ctx.strokeStyle = "#16110e";
-  ctx.strokeRect(FIELD.l - 4, FIELD.t - 12, FIELD.r - FIELD.l + 8, FIELD.b - FIELD.t + 16);
+  ctx.beginPath();
+  ctx.moveTo(FIELD.l - 4, FIELD.t);
+  ctx.lineTo(FIELD.l - 4, FIELD.b + 4);
+  ctx.lineTo(FIELD.r + 4, FIELD.b + 4);
+  ctx.lineTo(FIELD.r + 4, FIELD.t);
+  ctx.stroke();
 
   drawRail(ctx, time);
   if (state.ball && (state.phase === "lane" || state.phase === "rail" || state.phase === "drop")) {
@@ -524,8 +551,8 @@ export function render(ctx, state, fx, time) {
     drawBall(ctx, p.x, p.y, 8, "glass", 0.4);
   }
 
-  drawLane(ctx, state);
-  if (state.ball && state.phase === "drop") {
+  drawLane(ctx, state, time);
+  if (state.ball && (state.phase === "lane" || state.phase === "rail" || state.phase === "drop")) {
     drawBall(ctx, state.ball.x, state.ball.y, state.ball.r, state.ballType, 1);
   }
   drawFx(ctx, fx);

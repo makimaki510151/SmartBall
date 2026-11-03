@@ -8,6 +8,9 @@ export const RAIL_Y = 58;
 export const STAR_AT = [150, 300, 500, 800, 1200, 1800];
 
 const RAIL_SPAN = LANE_CX - 48;
+const RAIL_CX = 280;
+const RAIL_CY = 640;
+const RAIL_R = 600;
 
 export function starCount(best) {
   let n = 0;
@@ -46,7 +49,10 @@ export function powerToS(power) {
 }
 
 export function railPoint(s) {
-  return { x: LANE_CX - clamp(s, 0, 1) * RAIL_SPAN, y: RAIL_Y };
+  const x = LANE_CX - clamp(s, 0, 1) * RAIL_SPAN;
+  const dx = x - RAIL_CX;
+  const y = RAIL_CY - Math.sqrt(Math.max(0, RAIL_R * RAIL_R - dx * dx));
+  return { x, y };
 }
 
 export function zoneInfo(x) {
@@ -118,15 +124,19 @@ function makePins(pockets) {
     }
   };
 
-  // レーンの仕切り。完全には閉じず、弾んだ玉は隣へこぼれる。
-  wall(438, 140, 630, 24);
-  wall(356, 188, 640, 26);
-  wall(208, 200, 540, 26);
-  wall(136, 160, 650, 26);
+  // レーンの仕切り。玉が谷に挟まらないよう、隣の釘は玉の直径より離す。
+  wall(438, 150, 620, 36);
+  wall(356, 200, 620, 38);
+  wall(208, 210, 520, 38);
+  wall(136, 170, 640, 38);
 
-  // 安定穴の手前の釘。当たると減速して落ち、外すと速いまま唇で跳ねる。
+  // 左端は壁に吸い込まれやすいので、間隔を空けて中央へ返す。
+  add(68, 190, 5, true);
+  add(84, 310, 5, true);
+
+  // 安定穴の手前の釘。右の壁とのあいだは、玉が通れる幅を残す。
   add(452, 168, 5, true);
-  add(486, 196, 5, true);
+  add(458, 204, 5, true);
   add(448, 214, 4.6, true);
 
   // 中央大穴の袖。入口は広く、遅い玉は落ちる。
@@ -449,10 +459,11 @@ function tickTimers(state, dt) {
 
 function stepLane(state, dt) {
   const ball = state.ball;
+  const join = railPoint(0);
   ball.y += ball.vy * dt;
-  if (ball.y <= RAIL_Y) {
-    ball.y = RAIL_Y;
-    ball.x = LANE_CX;
+  if (ball.y <= join.y) {
+    ball.x = join.x;
+    ball.y = join.y;
     state.phase = "rail";
     state.railS = 0;
     state.railTarget = powerToS(state.launchPower);
@@ -470,10 +481,10 @@ function stepRail(state, dt) {
   if (state.railS >= state.railTarget) {
     state.phase = "drop";
     state.lastDropX = p.x;
-    ball.x = p.x + (state.rand() - 0.5) * 20;
-    ball.y = RAIL_Y;
-    ball.vx = (state.rand() - 0.5) * 36;
-    ball.vy = 40;
+    ball.x = p.x + (state.rand() - 0.5) * 10;
+    ball.y = p.y;
+    ball.vx = (state.rand() - 0.5) * 20;
+    ball.vy = 48;
   }
 }
 
@@ -731,11 +742,33 @@ function resolvePlay(state, dt) {
   if (state.phase !== "play") return;
 
   const speed = Math.hypot(ball.vx, ball.vy);
-  if (speed < 22) state._stuckT += dt;
+  if (speed < 28) state._stuckT += dt;
   else state._stuckT = 0;
-  if (state._stuckT > 0.65) {
-    ball.vy += 120;
-    ball.vx += (state.rand() - 0.5) * 80;
+  if (state._stuckT > 0.22) {
+    let pin = null;
+    let best = 1e9;
+    for (const nail of state.pins) {
+      const d = Math.hypot(ball.x - nail.x, ball.y - nail.y);
+      if (d < best) {
+        best = d;
+        pin = nail;
+      }
+    }
+    let sx = state.rand() - 0.5;
+    let sy = 1;
+    if (pin && best < 30) {
+      sx = ball.x - pin.x;
+      sy = ball.y - pin.y;
+    }
+    const len = Math.hypot(sx, sy) || 1;
+    sx /= len;
+    sy = Math.max(0.35, sy / len);
+    ball.x += sx * 10;
+    ball.y += sy * 8;
+    ball.vx = sx * 130;
+    ball.vy = 180;
+    if (ball.x < FIELD.l + r + 1) ball.x = FIELD.l + r + 1;
+    if (ball.x > FIELD.r - r - 1) ball.x = FIELD.r - r - 1;
     state._stuckT = 0;
   }
 
@@ -862,6 +895,30 @@ function runSelfTest() {
     const aim = aimFor(power);
     const top = Object.entries(ids).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}:${v}`).join(" ");
     console.log(power.toFixed(2), "x", Math.round(aim.x), "yaku", hits, "EV", (ev / N).toFixed(2), top);
+  }
+
+  let worst = 0;
+  for (let n = 0; n < 80; n += 1) {
+    const power = 0.16 + (n % 16) * 0.05;
+    const st = createState(9000 + n * 29);
+    st.stock = 4;
+    st.phase = "ready";
+    if (!launch(st, power).ok) continue;
+    let slow = 0;
+    let guard = 0;
+    while (st.phase !== "ready" && st.phase !== "empty" && guard < 4000) {
+      step(st, 1 / 120);
+      guard += 1;
+      if (st.phase === "play" && st.ball && Math.hypot(st.ball.vx, st.ball.vy) < 28) slow += 1 / 120;
+      else slow = 0;
+      if (slow > worst) worst = slow;
+    }
+    if (guard >= 4000) worst = 99;
+  }
+  console.log("dwell", worst.toFixed(2));
+  if (worst > 0.85) {
+    console.error("ball sat on the board");
+    process.exitCode = 1;
   }
 }
 

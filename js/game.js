@@ -1,6 +1,5 @@
 import {
   VIEW,
-  aimFor,
   createState,
   giveBalls,
   insertCoin,
@@ -16,15 +15,25 @@ import { createTray, stepTray, syncTray } from "./tray.js";
 const SAVE_KEY = "smartball-yokomon-v1";
 
 export const PRIZES = [
-  { id: "ramune", name: "ラムネ", cost: 20, sell: 50, blurb: "ビー玉のころがる音がする瓶。", hue: 188 },
-  { id: "kinako", name: "きなこ棒", cost: 40, sell: 70, blurb: "甘くて素朴な縁日の定番。", hue: 36 },
-  { id: "ohajiki", name: "おはじき", cost: 60, sell: 90, blurb: "光るガラスが七つ。", hue: 276 },
-  { id: "dagashi", name: "駄菓子袋", cost: 90, sell: 120, blurb: "店主が奥から出してくれる袋。", hue: 8 },
-  { id: "hanabi", name: "手持ち花火", cost: 130, sell: 160, blurb: "夜店の匂いがしそうだ。", hue: 4 },
-  { id: "kingyo", name: "金魚", cost: 180, sell: 210, blurb: "ぽうっと泳ぐ赤い一匹。", hue: 350 },
-  { id: "maneki", name: "招き猫", cost: 250, sell: 280, blurb: "左手をあげて、次の出玉を招く。", hue: 42 },
-  { id: "tsuten", name: "通天閣の根付", cost: 360, sell: 400, blurb: "新世界のネオンを小さく閉じ込めた。", hue: 262 },
-  { id: "trophy", name: "横モノの杯", cost: 520, sell: 520, blurb: "長く台に座った人だけの杯。", hue: 46 },
+  { id: "bidama", name: "ビー玉", cost: 15, sell: 40, blurb: "掌で鳴る、小さいガラス玉。", hue: 200 },
+  { id: "ramune", name: "ラムネ", cost: 25, sell: 55, blurb: "ビー玉のころがる音がする瓶。", hue: 188 },
+  { id: "kamifu", name: "紙風船", cost: 35, sell: 60, blurb: "息を入れると、丸く膨らむ。", hue: 12 },
+  { id: "kinako", name: "きなこ棒", cost: 45, sell: 75, blurb: "甘くて素朴な縁日の定番。", hue: 36 },
+  { id: "ringo", name: "りんご飴", cost: 55, sell: 85, blurb: "赤くて、棒の先で光る。", hue: 0 },
+  { id: "ohajiki", name: "おはじき", cost: 70, sell: 100, blurb: "光るガラスが七つ。", hue: 276 },
+  { id: "omen", name: "お面", cost: 85, sell: 115, blurb: "狐の面。ゴムが少し緩い。", hue: 28 },
+  { id: "dagashi", name: "駄菓子袋", cost: 100, sell: 130, blurb: "店主が奥から出してくれる袋。", hue: 8 },
+  { id: "yoyo", name: "水ヨーヨー", cost: 120, sell: 150, blurb: "ゴムの先で、ぷるぷる揺れる。", hue: 168 },
+  { id: "hanabi", name: "手持ち花火", cost: 145, sell: 175, blurb: "夜店の匂いがしそうだ。", hue: 4 },
+  { id: "kuji", name: "くじ引き", cost: 170, sell: 200, blurb: "折りたたんだ短冊が、まだ入っている。", hue: 330 },
+  { id: "kingyo", name: "金魚", cost: 200, sell: 230, blurb: "ぽうっと泳ぐ赤い一匹。", hue: 350 },
+  { id: "chochin", name: "提灯", cost: 240, sell: 270, blurb: "屋号が、墨で書いてある。", hue: 48 },
+  { id: "maneki", name: "招き猫", cost: 290, sell: 320, blurb: "左手をあげて、次の出玉を招く。", hue: 42 },
+  { id: "shateki", name: "射的のコルク銃", cost: 340, sell: 370, blurb: "コルクの玉が、三発残っている。", hue: 96 },
+  { id: "tsuten", name: "通天閣の根付", cost: 400, sell: 440, blurb: "新世界のネオンを小さく閉じ込めた。", hue: 262 },
+  { id: "noren", name: "縁日の暖簾", cost: 480, sell: 500, blurb: "藍の縞が、風で揺れる。", hue: 220 },
+  { id: "trophy", name: "横モノの杯", cost: 580, sell: 580, blurb: "長く台に座った人だけの杯。", hue: 46 },
+  { id: "tenugui", name: "店主の手ぬぐい", cost: 760, sell: 700, blurb: "店の名が、端に縫ってある。", hue: 140 },
 ];
 
 const MISSION_POOL = [
@@ -597,11 +606,6 @@ export class Game {
     this.save();
   }
 
-  setGuide(on) {
-    this.state.guide = on;
-    this.save();
-  }
-
   exchange(id) {
     const prize = PRIZES.find((p) => p.id === id);
     if (!prize) return;
@@ -696,13 +700,18 @@ export class Game {
       els.hot.textContent = hotText;
       this.ui.hot = hotText;
     }
-    const speech = this.speechT > 0 ? this.speech : "右のレバーを下に引いて、離すと玉が出る。";
+    const speech = this.speechT > 0 ? this.speech : "右の赤いレバーを下へ引いて、離すと玉が出る。";
     if (this.ui.speech !== speech) {
       els.speech.textContent = speech;
       this.ui.speech = speech;
     }
-    const aim = s.powerPreview >= 0.12 ? aimFor(s.powerPreview) : null;
-    const aimText = aim ? `ねらい：${aim.zone}（${aim.hint}）` : (s.lastPower ? "白線は、前回の力加減。" : "レバーを下に引いて、離す。");
+    let aimText = "右のレバーを下へ引いて、離す。";
+    if (s.powerPreview >= 0.12) {
+      const strength = s.powerPreview > 0.72 ? "強い" : s.powerPreview > 0.4 ? "中くらい" : "弱い";
+      aimText = `引きは${strength}。離すと玉が出る。`;
+    } else if (s.lastPower) {
+      aimText = "ゲージの白線は、前回引いた強さ。";
+    }
     if (this.ui.aim !== aimText) {
       els.aim.textContent = aimText;
       this.ui.aim = aimText;
@@ -733,7 +742,6 @@ export class Game {
     els.iron.classList.toggle("on", s.ballType === "iron");
     els.iron.disabled = !this.ironUnlocked;
     els.iron.title = this.ironUnlocked ? "重くて穴に落ちやすい" : `入賞${this.lifetime.pockets}/25で解禁`;
-    els.guide.checked = s.guide !== false;
     const spill = s.stock - s.boxedAt;
     const gazeCount = document.getElementById("gaze-count");
     if (gazeCount) {
