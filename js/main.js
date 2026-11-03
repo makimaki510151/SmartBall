@@ -6,6 +6,7 @@ const $ = (id) => document.getElementById(id);
 
 const audio = new AudioEngine();
 const canvas = $("board");
+const hopper = $("hopper");
 
 for (const row of document.querySelectorAll(".bulb-row")) {
   for (let i = 0; i < 16; i += 1) {
@@ -22,6 +23,7 @@ for (let i = 0; i < 12; i += 1) {
 
 const game = new Game({
   canvas,
+  hopper,
   audio,
   els: {
     stock: $("stock"),
@@ -164,7 +166,7 @@ function syncAudioControls() {
 
 function openModal(kind, html) {
   modal.dataset.kind = kind;
-  modal.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  modal.innerHTML = `<div class="sheet${kind === "gaze" ? " gaze-sheet" : ""}" role="dialog" aria-modal="true">${html}</div>`;
   modal.hidden = false;
   game.paused = true;
   modal.querySelectorAll("[data-close]").forEach((btn) => btn.addEventListener("click", closeModal));
@@ -174,6 +176,7 @@ function closeModal() {
   if (modal.hidden) return;
   modal.hidden = true;
   modal.innerHTML = "";
+  game.detachGaze();
   game.paused = false;
   if (!game.coachSeen) game.markCoach();
 }
@@ -187,12 +190,12 @@ function helpHtml(first) {
     <p class="eyebrow">遊び方</p>
     <h2>横モノのスマートボール</h2>
     <ol>
-      <li>「100円投入」で玉が25個、受け皿に落ちてくる。</li>
+      <li>「100円投入」で玉が25個、盤面の下の受け皿に落ちてくる。受け皿を押すと、近くで眺められる。</li>
       <li>右の赤いレバーを下に引いて離す。強く引くほど、玉は左のほうへ落ちる。</li>
-      <li>右の安定穴は入りやすく、5球。中央の15は速すぎると唇で跳ねる。</li>
+      <li>穴は落ちやすくしてある。右の安定穴は5球、中央の大穴は15球。</li>
       <li>Sのチャッカーを通すと、下の役物が開く。開いた穴に入ると15球。入った口は閉じる。</li>
       <li>「連」の穴は、左右そろってはじめて払い出される。</li>
-      <li>玉がガラスに積もったら「箱にしまう」。20球から、縁日の景品と交換できる。</li>
+      <li>受け皿が山になったら「箱にしまう」。箱の窓からも玉が見える。20球から、縁日の景品と交換できる。</li>
     </ol>
     <p>同じ力で打てるように、ゲージの白線が前回の強さを覚えている。スペースキーの長押しでもレバーになる。</p>
     <p class="note">これは現金の動かないおもちゃです。景品はブラウザの中のコレクションで、実物とは交換できません。</p>
@@ -240,6 +243,49 @@ function openPrizes(mode) {
     });
   });
 }
+
+function openGaze() {
+  if (!modal.hidden) return;
+  audio.unlock();
+  audio.play("ui");
+  openModal("gaze", `
+      <p class="eyebrow">受け皿</p>
+      <h2>持ち玉を眺める</h2>
+      <p id="gaze-count"></p>
+      <canvas id="gaze-board" width="900" height="540" aria-label="持ち玉の山"></canvas>
+      <p class="note">皿の上をドラッグすると、玉の山が傾く。ガラス玉と鉄球は、選んでいる玉の見た目になる。</p>
+      <button type="button" data-close>とじる</button>
+  `);
+  const board = $("gaze-board");
+  game.attachGaze(board);
+  let drag = null;
+  board.addEventListener("pointerdown", (event) => {
+    drag = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      ox: game.gazeTiltX,
+      oy: game.gazeTiltY,
+    };
+    board.setPointerCapture(event.pointerId);
+  });
+  board.addEventListener("pointermove", (event) => {
+    if (!drag || drag.id !== event.pointerId) return;
+    game.gazeDrag = true;
+    game.gazeTiltX = Math.max(-1.3, Math.min(1.3, drag.ox + (event.clientX - drag.x) / 160));
+    game.gazeTiltY = Math.max(-1, Math.min(1, drag.oy + (event.clientY - drag.y) / 200));
+  });
+  const endDrag = (event) => {
+    if (!drag || (event && drag.id !== event.pointerId)) return;
+    drag = null;
+    game.gazeDrag = false;
+  };
+  board.addEventListener("pointerup", endDrag);
+  board.addEventListener("pointercancel", endDrag);
+}
+
+$("gaze").addEventListener("click", openGaze);
+hopper.addEventListener("click", openGaze);
 
 $("help").addEventListener("click", () => openModal("help", helpHtml(false)));
 $("prizes").addEventListener("click", () => openPrizes("prizes"));

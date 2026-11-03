@@ -144,31 +144,39 @@ function drawPocket(ctx, p, state, time) {
   ctx.restore();
 }
 
-function drawBall(ctx, x, y, r, type, alpha) {
+function drawBall(ctx, x, y, r, type, alpha, glint = 0) {
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = "rgba(80,50,20,0.28)";
+  ctx.fillStyle = "rgba(40,20,10,0.32)";
   ctx.beginPath();
-  ctx.ellipse(x + 2, y + r * 0.75, r * 0.8, r * 0.35, 0, 0, Math.PI * 2);
+  ctx.ellipse(x + r * 0.15, y + r * 0.78, r * 0.82, r * 0.32, 0, 0, Math.PI * 2);
   ctx.fill();
-  const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.2, x, y, r);
+  const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.15, x, y, r);
   if (type === "iron") {
-    g.addColorStop(0, "#f4f7fb");
-    g.addColorStop(0.45, "#9aa6b5");
-    g.addColorStop(1, "#3e4854");
+    g.addColorStop(0, "#f7f9fc");
+    g.addColorStop(0.42, "#a8b3c2");
+    g.addColorStop(1, "#3a4450");
   } else {
     g.addColorStop(0, "#ffffff");
-    g.addColorStop(0.4, "#d7f6ff");
-    g.addColorStop(1, "#6ea8c9");
+    g.addColorStop(0.38, "#d9f4ff");
+    g.addColorStop(0.78, "#7eb4d4");
+    g.addColorStop(1, "#3f7494");
   }
   ctx.fillStyle = g;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.fillStyle = "rgba(255,255,255,0.92)";
   ctx.beginPath();
-  ctx.ellipse(x - r * 0.28, y - r * 0.32, r * 0.28, r * 0.18, -0.6, 0, Math.PI * 2);
+  ctx.ellipse(x - r * 0.28 + glint, y - r * 0.32, r * 0.28, r * 0.18, -0.6, 0, Math.PI * 2);
   ctx.fill();
+  if (type !== "iron") {
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = Math.max(1, r * 0.08);
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.72, 0.4, 1.5);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -314,26 +322,203 @@ function drawRail(ctx, time) {
   ctx.restore();
 }
 
-function drawSpill(ctx, state) {
-  const spill = Math.max(0, state.stock - state.boxedAt);
-  if (spill < 12) return;
-  const n = Math.min(36, spill - 8);
-  ctx.save();
-  for (let i = 0; i < n; i += 1) {
-    const col = i % 9;
-    const row = Math.floor(i / 9);
-    const x = 70 + col * 42 + (row % 2) * 14;
-    const y = FIELD.b - 18 - row * 16;
-    drawBall(ctx, x, y, 8, "glass", 0.55);
+export const HOPPER = { w: 640, h: 220 };
+export const GAZE = { w: 900, h: 540 };
+
+function packRows(count, width, r) {
+  const cols = Math.max(1, Math.floor((width - 8) / (r * 2)));
+  const rows = [];
+  let left = count;
+  let row = 0;
+  while (left > 0 && row < 48) {
+    const capacity = row % 2 ? Math.max(1, cols - 1) : cols;
+    const n = Math.min(capacity, left);
+    rows.push(n);
+    left -= n;
+    row += 1;
   }
-  if (spill > 28) {
-    const g = ctx.createLinearGradient(0, 680, 0, FIELD.b);
-    g.addColorStop(0, "rgba(255,255,255,0)");
-    g.addColorStop(1, "rgba(255,255,255,0.28)");
-    ctx.fillStyle = g;
-    ctx.fillRect(FIELD.l, 680, FIELD.r - FIELD.l, FIELD.b - 680);
+  return { rows, hidden: left };
+}
+
+function chooseRadius(count, width, height, maxR) {
+  if (count <= 0) return maxR;
+  let r = maxR;
+  for (let i = 0; i < 10; i += 1) {
+    const { rows, hidden } = packRows(count, width, r);
+    const need = rows.length * r * 1.68 + r * 1.4;
+    if (hidden === 0 && need <= height) return r;
+    r *= 0.84;
   }
-  ctx.restore();
+  return Math.max(3.6, r);
+}
+
+function pileBalls(count, rect, r) {
+  const { rows, hidden } = packRows(count, rect.w - 18, r);
+  const balls = [];
+  const floor = rect.y + rect.h - 14;
+  let idx = 0;
+  for (let row = 0; row < rows.length; row += 1) {
+    const n = rows[row];
+    const y = floor - r - row * r * 1.68;
+    const span = n * r * 2;
+    const start = rect.x + (rect.w - span) / 2 + r;
+    for (let i = 0; i < n; i += 1) {
+      const wobble = Math.sin(idx * 12.989) * r * 0.07;
+      balls.push({ x: start + i * r * 2 + wobble, y, r, idx });
+      idx += 1;
+    }
+  }
+  return { balls, hidden };
+}
+
+function drawWood(ctx, rect, radius) {
+  const g = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
+  g.addColorStop(0, "#a56b3c");
+  g.addColorStop(0.2, "#6b3a1e");
+  g.addColorStop(1, "#3a1c10");
+  ctx.fillStyle = g;
+  roundRect(ctx, rect.x, rect.y, rect.w, rect.h, radius);
+  ctx.fill();
+  ctx.strokeStyle = "#e6c27a";
+  ctx.lineWidth = 3;
+  roundRect(ctx, rect.x + 1.5, rect.y + 1.5, rect.w - 3, rect.h - 3, radius - 1);
+  ctx.stroke();
+}
+
+function drawBowlInterior(ctx, rect) {
+  const inset = 10;
+  const x = rect.x + inset;
+  const y = rect.y + 28;
+  const w = rect.w - inset * 2;
+  const h = rect.h - 38;
+  const g = ctx.createLinearGradient(x, y, x, y + h);
+  g.addColorStop(0, "#2a140e");
+  g.addColorStop(0.55, "#140a08");
+  g.addColorStop(1, "#3a2216");
+  ctx.fillStyle = g;
+  roundRect(ctx, x, y, w, h, 12);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 214, 150, 0.28)";
+  ctx.lineWidth = 2;
+  roundRect(ctx, x, y, w, h, 12);
+  ctx.stroke();
+  return { x, y, w, h };
+}
+
+function columnTarget(count) {
+  if (count <= 1) return 1;
+  if (count <= 6) return count;
+  if (count <= 28) return 6;
+  if (count <= 70) return 9;
+  if (count <= 160) return 12;
+  return 16;
+}
+
+function drawPile(ctx, interior, count, type, time, fallN, fallAge, tiltX, tiltY, maxR, close) {
+  if (count <= 0) {
+    ctx.fillStyle = "rgba(255, 220, 170, 0.55)";
+    ctx.font = `700 15px ${JP}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("まだ玉がない", interior.x + interior.w / 2, interior.y + interior.h / 2);
+    return;
+  }
+  const cols = columnTarget(count);
+  const packW = Math.min(interior.w - 8, cols * maxR * 2 + 8);
+  const pack = {
+    x: interior.x + (interior.w - packW) / 2,
+    y: interior.y,
+    w: packW,
+    h: interior.h,
+  };
+  const r = chooseRadius(count, pack.w, pack.h, maxR);
+  const { balls, hidden } = pileBalls(count, pack, r);
+  const cy = interior.y + interior.h / 2;
+  const fall = Math.max(0, 1 - fallAge / 0.85);
+  const reach = close ? 78 : 12;
+  const ordered = balls.slice().sort((a, b) => a.y - b.y);
+  for (const b of ordered) {
+    const fresh = fallN > 0 && b.idx >= balls.length - Math.min(fallN, balls.length);
+    const drop = fresh ? fall * fall * (86 + (b.idx % 6) * 12) : 0;
+    const depth = (b.y - interior.y) / Math.max(1, interior.h);
+    const scale = close ? 0.84 + depth * 0.34 : 1;
+    const rr = b.r * scale;
+    const x = b.x + tiltX * reach + tiltX * (cy - b.y) * (close ? 0.2 : 0.03);
+    const y = b.y - drop + tiltY * (close ? 26 : 6);
+    if (y + rr < interior.y - 8) continue;
+    const glint = Math.sin(time * 2.2 + b.idx * 0.7) * rr * 0.12 + tiltX * rr * 0.35;
+    drawBall(ctx, x, y, rr, type, 1, glint);
+  }
+  if (hidden > 0) {
+    ctx.fillStyle = "#ffe7b0";
+    ctx.font = `700 14px ${JP}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(`ほか ${hidden}`, interior.x + interior.w / 2, interior.y + 4);
+  }
+}
+
+function renderOwned(ctx, view, time, size, close) {
+  const { w, h } = size;
+  ctx.clearRect(0, 0, w, h);
+  const sky = ctx.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, close ? "#4a2218" : "#3a1a12");
+  sky.addColorStop(1, "#1a0c08");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, w, h);
+
+  const loose = Math.max(0, view.loose | 0);
+  const boxed = Math.max(0, view.boxed | 0);
+  const type = view.type === "iron" ? "iron" : "glass";
+  const tiltX = view.tiltX || 0;
+  const tiltY = view.tiltY || 0;
+  const pad = close ? 18 : 12;
+  let dish;
+  let crate = null;
+  if (boxed > 0) {
+    const crateW = Math.round(w * (close ? 0.34 : 0.3));
+    const gap = 12;
+    dish = { x: pad, y: close ? 18 : 10, w: w - pad * 2 - crateW - gap, h: h - (close ? 36 : 20) };
+    crate = { x: w - pad - crateW, y: dish.y, w: crateW, h: dish.h };
+  } else {
+    dish = { x: pad, y: close ? 18 : 10, w: w - pad * 2, h: h - (close ? 36 : 20) };
+  }
+
+  const label = (rect, text) => {
+    ctx.fillStyle = "#ffe1a8";
+    ctx.font = `700 ${close ? 16 : 13}px ${JP}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(text, rect.x + 14, rect.y + 8);
+  };
+
+  drawWood(ctx, dish, 16);
+  label(dish, `受け皿 ${loose}`);
+  const dishIn = drawBowlInterior(ctx, dish);
+  drawPile(ctx, dishIn, loose, type, time, view.looseFallN || 0, view.looseFallAge || 99, tiltX, tiltY, close ? 46 : 18, close);
+
+  if (crate) {
+    drawWood(ctx, crate, 16);
+    label(crate, `箱 ${boxed}`);
+    const crateIn = drawBowlInterior(ctx, crate);
+    ctx.save();
+    roundRect(ctx, crateIn.x, crateIn.y, crateIn.w, crateIn.h, 12);
+    ctx.clip();
+    drawPile(ctx, crateIn, boxed, type, time, view.boxedFallN || 0, view.boxedFallAge || 99, tiltX * 0.45, tiltY * 0.45, close ? 36 : 15, close);
+    ctx.restore();
+    ctx.strokeStyle = "rgba(210, 240, 255, 0.35)";
+    ctx.lineWidth = 2;
+    roundRect(ctx, crateIn.x + 6, crateIn.y + 6, crateIn.w - 12, crateIn.h - 12, 8);
+    ctx.stroke();
+  }
+}
+
+export function renderHopper(ctx, view, time) {
+  renderOwned(ctx, view, time, HOPPER, false);
+}
+
+export function renderGaze(ctx, view, time) {
+  renderOwned(ctx, view, time, GAZE, true);
 }
 
 function drawFx(ctx, fx) {
@@ -428,8 +613,6 @@ export function render(ctx, state, fx, time) {
   if (state.ball && state.phase === "play") {
     drawBall(ctx, state.ball.x, state.ball.y, state.ball.r, state.ballType, 1);
   }
-
-  drawSpill(ctx, state);
 
   ctx.strokeStyle = "rgba(255,255,255,0.35)";
   ctx.lineWidth = 10;

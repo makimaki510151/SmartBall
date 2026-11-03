@@ -136,7 +136,7 @@ h1 {
   box-shadow: inset 0 0 0 3px #e6c36a, 0 18px 40px rgba(0, 0, 0, 0.35);
 }
 
-canvas {
+#board {
   display: block;
   width: 100%;
   height: auto;
@@ -146,6 +146,34 @@ canvas {
   touch-action: none;
   cursor: ns-resize;
 }
+
+.hopper {
+  position: relative;
+  margin-top: 12px;
+}
+#hopper {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 640 / 220;
+  border-radius: 16px;
+  background: #1a0c08;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#gaze-board {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 900 / 540;
+  border-radius: 16px;
+  background: #1a0c08;
+  cursor: grab;
+  touch-action: none;
+}
+#gaze-board:active { cursor: grabbing; }
+.sheet.gaze-sheet { width: min(960px, 100%); }
+.sheet.gaze-sheet .note { color: #6a4034; }
 
 .fever-banner, .combo {
   position: absolute;
