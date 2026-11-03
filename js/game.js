@@ -82,7 +82,8 @@ export class Game {
     this.lastT = 0;
     this.ui = {};
     this.load();
-    this.missions = this.rollMissions();
+    if (!this.missions.length) this.missions = this.rollMissions();
+    this.shownStock = this.state.stock;
     this.resize();
   }
 
@@ -158,6 +159,47 @@ export class Game {
       if (!data || data.v !== 1) return;
       if (Number.isFinite(data.yen)) this.state.yen = data.yen;
       if (Number.isFinite(data.bestStock)) this.state.bestStock = data.bestStock;
+      if (Number.isFinite(data.stock)) this.state.stock = Math.max(0, Math.min(9999, Math.floor(data.stock)));
+      if (Number.isFinite(data.boxedAt)) {
+        this.state.boxedAt = Math.max(0, Math.min(this.state.stock, Math.floor(data.boxedAt)));
+      }
+      if (this.state.stock > 0) this.state.phase = "ready";
+      const hotPool = ["safe", "left5", "big", "midR", "midL", "last"];
+      if (hotPool.includes(data.hotId)) this.state.hotId = data.hotId;
+      if (Number.isFinite(data.heat)) this.state.heat = Math.max(0, Math.min(100, data.heat));
+      if (Number.isFinite(data.fever)) this.state.fever = Math.max(0, Math.min(22, data.fever));
+      if (this.state.fever > 0) this.state.stats._feverOn = true;
+      if (Number.isFinite(data.combo)) this.state.combo = Math.max(0, Math.min(99, Math.floor(data.combo)));
+      if (Number.isFinite(data.comboTimer)) this.state.comboTimer = Math.max(0, Math.min(6, data.comboTimer));
+      if (Number.isFinite(data.bestCombo)) this.state.bestCombo = Math.max(0, Math.floor(data.bestCombo));
+      if (Number.isFinite(data.yakuTimer)) this.state.yakuTimer = Math.max(0, Math.min(30, data.yakuTimer));
+      if (Number.isFinite(data.launches)) this.state.stats.launches = Math.max(0, Math.floor(data.launches));
+      if (Array.isArray(data.held)) {
+        for (const id of data.held) {
+          const pocket = this.state.pockets.find((p) => p.id === id && p.type === "rensho");
+          if (pocket) pocket.held = true;
+        }
+      }
+      if (Array.isArray(data.yakuOpen)) {
+        for (const id of data.yakuOpen) {
+          const pocket = this.state.pockets.find((p) => p.id === id && p.type === "yakumono");
+          if (pocket) pocket.open = true;
+        }
+      }
+      if (this.state.yakuTimer <= 0 && this.state.fever <= 0) {
+        for (const pocket of this.state.pockets) {
+          if (pocket.type === "yakumono") pocket.open = false;
+        }
+      }
+      if (Array.isArray(data.missions)) {
+        const restored = data.missions.map((raw) => {
+          const base = MISSION_POOL.find((m) => m.key === raw?.key);
+          if (!base) return null;
+          const prog = Number.isFinite(raw.prog) ? Math.max(0, raw.prog) : 0;
+          return { ...base, prog: Math.min(base.goal, prog), done: !!raw.done || prog >= base.goal };
+        }).filter(Boolean);
+        if (restored.length === 3) this.missions = restored;
+      }
       if (data.lifetime) this.lifetime = { ...this.lifetime, ...data.lifetime };
       if (Number.isFinite(data.storyRead)) {
         this.storyRead = Math.max(0, Math.min(LINES.length, Math.floor(data.storyRead)));
@@ -179,15 +221,30 @@ export class Game {
   }
 
   save() {
+    this._saveAt = performance.now();
     try {
+      const s = this.state;
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         v: 1,
-        yen: this.state.yen,
-        bestStock: this.state.bestStock,
+        yen: s.yen,
+        stock: s.stock,
+        boxedAt: s.boxedAt,
+        bestStock: s.bestStock,
+        hotId: s.hotId,
+        heat: s.heat,
+        fever: s.fever,
+        combo: s.combo,
+        comboTimer: s.comboTimer,
+        bestCombo: s.bestCombo,
+        yakuTimer: s.yakuTimer,
+        launches: s.stats.launches,
+        held: s.pockets.filter((p) => p.held).map((p) => p.id),
+        yakuOpen: s.pockets.filter((p) => p.type === "yakumono" && p.open).map((p) => p.id),
+        missions: this.missions.map((m) => ({ key: m.key, prog: m.prog, done: m.done })),
         lifetime: this.lifetime,
         storyRead: this.storyRead,
-        ballType: this.state.ballType,
-        guide: this.state.guide,
+        ballType: s.ballType,
+        guide: s.guide,
         ironUnlocked: this.ironUnlocked,
         coachSeen: this.coachSeen,
         audio: {
@@ -443,6 +500,7 @@ export class Game {
     } else if (ev.type === "cap") {
       this.say("持ち玉が満杯。あふれた分はコインにした。");
     }
+    if (ev.type !== "pin" && ev.type !== "nearmiss" && !(ev.type === "bumper" && !ev.pay)) this.save();
   }
 
   noteMission(ev) {
@@ -713,6 +771,8 @@ export class Game {
     els.iron.classList.toggle("on", s.ballType === "iron");
     els.iron.disabled = !this.ironUnlocked;
     els.iron.title = this.ironUnlocked ? "重くて穴に落ちやすい" : `入賞${this.lifetime.pockets}/25で解禁`;
+    const now = performance.now();
+    if (!this._saveAt || now - this._saveAt > 2000) this.save();
     const spill = s.stock - s.boxedAt;
     const gazeCount = document.getElementById("gaze-count");
     if (gazeCount) {

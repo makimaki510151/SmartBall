@@ -160,7 +160,7 @@ function makePins(pockets) {
 
   // 中盤のまばらな釘
   const scatter = [
-    [168, 300], [168, 360], [230, 250], [274, 286], [318, 250],
+    [172, 260], [230, 250], [274, 286], [318, 250],
     [392, 300], [392, 390], [100, 360], [100, 430],
     [168, 560], [230, 640], [392, 560], [450, 360], [450, 470],
     [274, 500], [274, 640], [334, 640],
@@ -550,7 +550,12 @@ function capture(state, pocket) {
   if (pocket.type === "rensho") {
     const partner = state.pockets.find((q) => q.type === "rensho" && q.id !== pocket.id);
     if (pocket.held) {
-      pushOut(ball, pocket, 0.4);
+      ball.x = pocket.x;
+      ball.y = pocket.y + pocket.r + ball.r + 6;
+      ball.vx *= 0.2;
+      ball.vy = 280;
+      ball.skipId = pocket.id;
+      ball.skipT = 0.28;
       return;
     }
     if (partner && partner.held) {
@@ -738,7 +743,13 @@ function resolvePlay(state, dt) {
       continue;
     }
     if (p.type === "rensho" && p.held) {
-      pushOut(ball, p, 0.4);
+      // 点いている連の縁で往復すると、口の半径より内側に押し戻され続ける。
+      ball.x = p.x;
+      ball.y = p.y + p.r + r + 6;
+      ball.vx *= 0.2;
+      ball.vy = 280;
+      ball.skipId = p.id;
+      ball.skipT = 0.28;
       continue;
     }
     const speed = Math.hypot(ball.vx, ball.vy);
@@ -975,6 +986,51 @@ function runSelfTest() {
   if (tight > 0) {
     console.error("pins can trap a ball");
     process.exitCode = 1;
+  }
+  const lane = nails.filter((p) => p.x > 110 && p.x < 220 && p.y > 240 && p.y < 420);
+  for (let i = 0; i < lane.length; i += 1) {
+    for (let j = i + 1; j < lane.length; j += 1) {
+      const gap = Math.hypot(lane[i].x - lane[j].x, lane[i].y - lane[j].y) - lane[i].r - lane[j].r;
+      if (gap < 24) {
+        console.error("left lane pins are still too close", lane[i], lane[j], gap);
+        process.exitCode = 1;
+      }
+    }
+  }
+  for (const holdId of ["renL", "renR"]) {
+    const st = createState(42);
+    st.stock = 4;
+    st.phase = "play";
+    st.pockets.find((p) => p.id === holdId).held = true;
+    const hole = st.pockets.find((p) => p.id === holdId);
+    const spec = ballSpec("glass");
+    st.ball = {
+      x: hole.x,
+      y: hole.y - 36,
+      vx: 0,
+      vy: 60,
+      r: spec.r,
+      grav: spec.grav,
+      rest: spec.rest,
+      catchBonus: spec.catchBonus,
+      shotId: 1,
+      didChucker: true,
+      age: 0,
+      skipId: null,
+      skipT: 0,
+    };
+    let guard = 0;
+    let near = 0;
+    while (st.phase === "play" && guard < 2400) {
+      step(st, 1 / 120);
+      guard += 1;
+      if (!st.ball) break;
+      if (Math.hypot(st.ball.x - hole.x, st.ball.y - hole.y) < hole.r + 8) near += 1;
+    }
+    if (st.phase === "play" || near > 40) {
+      console.error("second ball stuck on held rensho", holdId, st.phase, near);
+      process.exitCode = 1;
+    }
   }
 }
 
