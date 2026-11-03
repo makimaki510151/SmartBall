@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>スマートボール — 横モノ</title>
+  <meta name="description" content="100円で25球。レバーの強さで穴を狙う、ブラウザのスマートボール。">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23c81e1e'/%3E%3Ccircle cx='12' cy='12' r='4' fill='%23fff' opacity='.8'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="lanterns" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="app">
+    <header class="marquee">
+      <div class="bulb-row"></div>
+      <div class="marquee-copy">
+        <p class="eyebrow">昭和の横モノ</p>
+        <h1>スマートボール</h1>
+        <p class="stars" id="stars" aria-label="獲得した星">☆☆☆☆☆☆</p>
+      </div>
+      <div class="bulb-row"></div>
+    </header>
+
+    <div class="layout">
+      <section class="machine">
+        <p class="speech" id="speech" role="status">100円入れると、玉が25個おりてくる。</p>
+        <div class="board-frame" id="frame">
+          <canvas id="board" width="660" height="900" aria-label="スマートボールの盤面"></canvas>
+          <div class="fever-banner" id="fever" hidden>FEVER</div>
+          <div class="combo" id="combo" hidden>2 COMBO</div>
+        </div>
+        <div class="tray">
+          <div class="stock-readout">
+            <span>持ち玉</span>
+            <b id="stock">0</b>
+          </div>
+          <div class="tray-actions">
+            <button id="coin" class="coin-btn" type="button">100円投入<small>25球</small></button>
+            <button id="repeat" type="button">同じ力で打つ</button>
+            <button id="box" type="button">箱にしまう</button>
+            <button id="plead" type="button" hidden>店主のサービス</button>
+          </div>
+          <p class="aim-readout" id="aim">レバーを下に引いて、離す。</p>
+        </div>
+      </section>
+
+      <aside class="panel">
+        <section>
+          <h2>カウンター</h2>
+          <dl class="stats">
+            <div><dt>持ち金</dt><dd id="yen">1,000円</dd></div>
+            <div><dt>最高持ち玉</dt><dd id="best">0</dd></div>
+            <div><dt>次の星</dt><dd id="next-star">あと150</dd></div>
+            <div><dt>サービスまで</dt><dd id="service-left">あと40球</dd></div>
+            <div><dt>連勝穴</dt><dd id="rensho-readout">左○ 右○</dd></div>
+            <div><dt>今日の熱穴</dt><dd id="hot-readout">—</dd></div>
+          </dl>
+          <div class="heat-wrap">
+            <span>FEVER</span>
+            <div class="heat" id="heat" aria-hidden="true"></div>
+          </div>
+        </section>
+
+        <section>
+          <h2>音量</h2>
+          <label>全体<input id="vol" type="range" min="0" max="100" value="75"></label>
+          <label>BGM<input id="bgm" type="range" min="0" max="100" value="42"></label>
+          <label>効果音<input id="se" type="range" min="0" max="100" value="85"></label>
+          <button id="mute" type="button" aria-pressed="false">音を消す</button>
+        </section>
+
+        <section>
+          <h2>玉</h2>
+          <div class="ball-types">
+            <button id="ball-glass" type="button" class="on">ガラス玉</button>
+            <button id="ball-iron" type="button">鉄球</button>
+          </div>
+          <p class="note">ガラス玉は軽くて跳ねる。鉄球は入賞を重ねると使える。</p>
+        </section>
+
+        <section>
+          <h2>今日のお題</h2>
+          <ul id="missions"></ul>
+        </section>
+
+        <section class="panel-actions">
+          <button id="help" type="button">遊び方</button>
+          <button id="prizes" type="button">景品交換</button>
+          <button id="book" type="button">図鑑</button>
+          <button id="reroll" type="button">台を入れ替える</button>
+          <label class="check"><input id="guide" type="checkbox" checked> 狙い線を表示</label>
+        </section>
+      </aside>
+    </div>
+
+    <footer>
+      <p>Wikipediaの「スマートボール」にある、寝かせた盤面・100円25球・入賞の払い出し・連勝穴・役物・箱にしまう、を参考にした無料のゲームです。現金の賭けはなく、景品はブラウザ内のコレクションです。</p>
+    </footer>
+  </div>
+  <div id="modal" class="modal" hidden></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
