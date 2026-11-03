@@ -1,6 +1,7 @@
 import { VIEW } from "./sim.js";
 import { AudioEngine } from "./audio.js";
-import { Game, PRIZES } from "./game.js";
+import { Game } from "./game.js";
+import { BALL_TOTAL, LINES, costAt, spentBefore } from "./story.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -163,8 +164,9 @@ function syncAudioControls() {
 }
 
 function openModal(kind, html) {
+  const extra = kind === "gaze" ? " gaze-sheet" : kind === "story" ? " story-sheet" : "";
   modal.dataset.kind = kind;
-  modal.innerHTML = `<div class="sheet${kind === "gaze" ? " gaze-sheet" : ""}" role="dialog" aria-modal="true">${html}</div>`;
+  modal.innerHTML = `<div class="sheet${extra}" role="dialog" aria-modal="true">${html}</div>`;
   modal.hidden = false;
   game.paused = true;
   modal.querySelectorAll("[data-close]").forEach((btn) => btn.addEventListener("click", closeModal));
@@ -193,53 +195,75 @@ function helpHtml(first) {
       <li>釘が落ち筋を曲げる。右の安定穴は5球、中央の大穴は15球。</li>
       <li>Sのチャッカーを通すと、下の役物が開く。開いた穴に入ると15球。入った口は閉じる。</li>
       <li>「連」の穴は、左右そろってはじめて払い出される。</li>
-      <li>受け皿が山になったら「箱にしまう」。箱の窓からも玉が見える。15球から、縁日の景品と交換できる。</li>
+      <li>受け皿が山になったら「箱にしまう」。箱の窓からも玉が見える。玉を使うと、引き出しの帳面が一行ずつ開く。</li>
     </ol>
     <p>ゲージの白線は前回の強さです。同じ力で続けて打つと、レールが滑って落ち口が左右にずれます。スペースキーの長押しでもレバーになります。</p>
-    <p class="note">これは現金の動かないおもちゃです。景品はブラウザの中のコレクションで、実物とは交換できません。</p>
+    <p class="note">これは現金の動かないおもちゃです。帳面の話は、このブラウザの中だけに残ります。全部読むには、十万球ほどいります。</p>
     <button type="button" data-close>${first ? "台につく" : "とじる"}</button>
   `;
 }
 
-function prizeCard(prize, mode) {
-  const owned = game.collection[prize.id] || 0;
-  const known = !!game.discovered[prize.id];
-  const afford = game.state.stock >= prize.cost;
-  if (mode === "book" && !known) {
-    return `<article class="prize locked"><div class="medal" style="--h:${prize.hue}">?</div><h3>？？？</h3><p>${prize.cost}球で交換すると、中身がわかる。</p></article>`;
-  }
-  const actions = mode === "book"
-    ? `<p class="own">所持 ${owned}</p>`
-    : `<p class="own">所持 ${owned}</p>
-       <button type="button" data-buy="${prize.id}" ${afford ? "" : "disabled"}>${prize.cost}球で交換</button>
-       <button type="button" data-sell="${prize.id}" ${owned ? "" : "disabled"}>${prize.sell}円にする</button>`;
-  return `<article class="prize"><div class="medal" style="--h:${prize.hue}">${prize.name.slice(0, 1)}</div><h3>${prize.name}</h3><p>${prize.blurb}</p>${actions}</article>`;
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, (ch) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+  }[ch]));
 }
 
-function openPrizes(mode) {
-  const title = mode === "book" ? "景品図鑑" : "景品交換";
-  const lead = mode === "book"
-    ? "はじめて交換した景品が、ここに残る。"
-    : `いまの持ち玉は ${game.state.stock}。15球からビー玉と交換できる。コインに戻すと、また玉が買える。`;
-  openModal(mode, `
-    <p class="eyebrow">縁日のカウンター</p>
-    <h2>${title}</h2>
-    <p>${lead}</p>
-    <div class="prize-grid">${PRIZES.map((p) => prizeCard(p, mode)).join("")}</div>
+function paintStory() {
+  const read = game.storyRead;
+  const meta = $("story-meta");
+  const log = $("story-log");
+  const next = $("story-next");
+  if (!meta || !log || !next) return;
+  const spent = spentBefore(read);
+  meta.textContent = `持ち玉 ${game.state.stock}　開いた行 ${read} / ${LINES.length}　消費した玉 ${spent.toLocaleString("ja-JP")} / ${BALL_TOTAL.toLocaleString("ja-JP")}`;
+  if (read === 0) {
+    log.innerHTML = `<p class="story-empty">まだ一行も開いていない。</p>`;
+  } else {
+    const parts = new Array(read);
+    for (let i = 0; i < read; i += 1) parts[i] = `<p>${escapeHtml(LINES[i])}</p>`;
+    log.innerHTML = parts.join("");
+  }
+  log.scrollTop = log.scrollHeight;
+  if (read >= LINES.length) {
+    next.textContent = "最後の一行まで読んだ";
+    next.disabled = true;
+  } else {
+    const cost = costAt(read);
+    next.textContent = `次の一行を読む（${cost}球）`;
+    next.disabled = game.state.stock < cost;
+  }
+  $("story").textContent = read > 0 ? `物語 ${read}` : "物語";
+}
+
+function openStory() {
+  if (modal.dataset.kind === "story" && !modal.hidden) {
+    paintStory();
+    return;
+  }
+  openModal("story", `
+    <p class="eyebrow">引き出しの帳面</p>
+    <h2>横モノ夜話</h2>
+    <p id="story-meta" class="story-meta"></p>
+    <div id="story-log" class="story-log" tabindex="0"></div>
+    <button id="story-next" type="button"></button>
+    <p class="note">玉が足りなければ、いったん閉じて打つ。一行は短く、夜は長い。</p>
     <button type="button" data-close>とじる</button>
   `);
-  modal.querySelectorAll("[data-buy]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      game.exchange(btn.dataset.buy);
-      openPrizes(mode);
-    });
+  $("story-next").addEventListener("click", () => {
+    game.readNext();
+    paintStory();
   });
-  modal.querySelectorAll("[data-sell]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      game.sell(btn.dataset.sell);
-      openPrizes(mode);
-    });
-  });
+  paintStory();
+}
+
+function paintStoryButton() {
+  const read = game.storyRead;
+  $("story").textContent = read > 0 ? `物語 ${read}` : "物語";
 }
 
 function openGaze() {
@@ -286,8 +310,8 @@ $("gaze").addEventListener("click", openGaze);
 hopper.addEventListener("click", openGaze);
 
 $("help").addEventListener("click", () => openModal("help", helpHtml(false)));
-$("prizes").addEventListener("click", () => openPrizes("prizes"));
-$("book").addEventListener("click", () => openPrizes("book"));
+$("story").addEventListener("click", openStory);
+paintStoryButton();
 
 function fitStage() {
   const stage = document.querySelector(".stage");
