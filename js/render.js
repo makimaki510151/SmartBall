@@ -284,7 +284,7 @@ function drawRail(ctx, time) {
   ctx.restore();
 }
 
-export const HOPPER = { w: 640, h: 220 };
+export const HOPPER = { w: 640, h: 150 };
 export const GAZE = { w: 900, h: 540 };
 
 function packRows(count, width, r) {
