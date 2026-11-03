@@ -287,52 +287,6 @@ function drawRail(ctx, time) {
 export const HOPPER = { w: 640, h: 150 };
 export const GAZE = { w: 900, h: 540 };
 
-function packRows(count, width, r) {
-  const cols = Math.max(1, Math.floor((width - 8) / (r * 2)));
-  const rows = [];
-  let left = count;
-  let row = 0;
-  while (left > 0 && row < 48) {
-    const capacity = row % 2 ? Math.max(1, cols - 1) : cols;
-    const n = Math.min(capacity, left);
-    rows.push(n);
-    left -= n;
-    row += 1;
-  }
-  return { rows, hidden: left };
-}
-
-function chooseRadius(count, width, height, maxR) {
-  if (count <= 0) return maxR;
-  let r = maxR;
-  for (let i = 0; i < 10; i += 1) {
-    const { rows, hidden } = packRows(count, width, r);
-    const need = rows.length * r * 1.68 + r * 1.4;
-    if (hidden === 0 && need <= height) return r;
-    r *= 0.84;
-  }
-  return Math.max(3.6, r);
-}
-
-function pileBalls(count, rect, r) {
-  const { rows, hidden } = packRows(count, rect.w - 18, r);
-  const balls = [];
-  const floor = rect.y + rect.h - 14;
-  let idx = 0;
-  for (let row = 0; row < rows.length; row += 1) {
-    const n = rows[row];
-    const y = floor - r - row * r * 1.68;
-    const span = n * r * 2;
-    const start = rect.x + (rect.w - span) / 2 + r;
-    for (let i = 0; i < n; i += 1) {
-      const wobble = Math.sin(idx * 12.989) * r * 0.07;
-      balls.push({ x: start + i * r * 2 + wobble, y, r, idx });
-      idx += 1;
-    }
-  }
-  return { balls, hidden };
-}
-
 function drawWood(ctx, rect) {
   ctx.fillStyle = "#6a4328";
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
@@ -358,17 +312,8 @@ function drawBowlInterior(ctx, rect) {
   return { x, y, w, h };
 }
 
-function columnTarget(count) {
-  if (count <= 1) return 1;
-  if (count <= 6) return count;
-  if (count <= 28) return 6;
-  if (count <= 70) return 9;
-  if (count <= 160) return 12;
-  return 16;
-}
-
-function drawPile(ctx, interior, count, type, time, fallN, fallAge, tiltX, tiltY, maxR, close) {
-  if (count <= 0) {
+function drawPhysical(ctx, interior, balls, space, count, hidden, type, time, tiltX) {
+  if (!balls || !space || count <= 0) {
     ctx.fillStyle = "rgba(255, 220, 170, 0.55)";
     ctx.font = `700 15px ${JP}`;
     ctx.textAlign = "center";
@@ -376,32 +321,21 @@ function drawPile(ctx, interior, count, type, time, fallN, fallAge, tiltX, tiltY
     ctx.fillText("まだ玉がない", interior.x + interior.w / 2, interior.y + interior.h / 2);
     return;
   }
-  const cols = columnTarget(count);
-  const packW = Math.min(interior.w - 8, cols * maxR * 2 + 8);
-  const pack = {
-    x: interior.x + (interior.w - packW) / 2,
-    y: interior.y,
-    w: packW,
-    h: interior.h,
-  };
-  const r = chooseRadius(count, pack.w, pack.h, maxR);
-  const { balls, hidden } = pileBalls(count, pack, r);
-  const cy = interior.y + interior.h / 2;
-  const fall = Math.max(0, 1 - fallAge / 0.85);
-  const reach = close ? 78 : 12;
+  const scale = Math.min(interior.w / space.w, interior.h / space.h);
+  const ox = interior.x + (interior.w - space.w * scale) / 2;
+  const oy = interior.y + interior.h - space.h * scale;
   const ordered = balls.slice().sort((a, b) => a.y - b.y);
-  for (const b of ordered) {
-    const fresh = fallN > 0 && b.idx >= balls.length - Math.min(fallN, balls.length);
-    const drop = fresh ? fall * fall * (86 + (b.idx % 6) * 12) : 0;
-    const depth = (b.y - interior.y) / Math.max(1, interior.h);
-    const scale = close ? 0.84 + depth * 0.34 : 1;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(interior.x, interior.y, interior.w, interior.h);
+  ctx.clip();
+  for (let i = 0; i < ordered.length; i += 1) {
+    const b = ordered[i];
     const rr = b.r * scale;
-    const x = b.x + tiltX * reach + tiltX * (cy - b.y) * (close ? 0.2 : 0.03);
-    const y = b.y - drop + tiltY * (close ? 26 : 6);
-    if (y + rr < interior.y - 8) continue;
-    const glint = Math.sin(time * 2.2 + b.idx * 0.7) * rr * 0.12 + tiltX * rr * 0.35;
-    drawBall(ctx, x, y, rr, type, 1, glint);
+    const glint = Math.sin(time * 2.2 + i * 0.7) * rr * 0.12 + (tiltX || 0) * rr * 0.28;
+    drawBall(ctx, ox + b.x * scale, oy + b.y * scale, rr, type, 1, glint);
   }
+  ctx.restore();
   if (hidden > 0) {
     ctx.fillStyle = "#ffe7b0";
     ctx.font = `700 14px ${JP}`;
@@ -421,7 +355,6 @@ function renderOwned(ctx, view, time, size, close) {
   const boxed = Math.max(0, view.boxed | 0);
   const type = view.type === "iron" ? "iron" : "glass";
   const tiltX = view.tiltX || 0;
-  const tiltY = view.tiltY || 0;
   const pad = close ? 18 : 12;
   let dish;
   let crate = null;
@@ -445,7 +378,7 @@ function renderOwned(ctx, view, time, size, close) {
   drawWood(ctx, dish);
   label(dish, `受け皿 ${loose}`);
   const dishIn = drawBowlInterior(ctx, dish);
-  drawPile(ctx, dishIn, loose, type, time, view.looseFallN || 0, view.looseFallAge || 99, tiltX, tiltY, close ? 46 : 18, close);
+  drawPhysical(ctx, dishIn, view.dishBalls, view.dishSpace, loose, view.dishHidden || 0, type, time, tiltX);
 
   if (crate) {
     drawWood(ctx, crate);
@@ -455,7 +388,7 @@ function renderOwned(ctx, view, time, size, close) {
     ctx.beginPath();
     ctx.rect(crateIn.x, crateIn.y, crateIn.w, crateIn.h);
     ctx.clip();
-    drawPile(ctx, crateIn, boxed, type, time, view.boxedFallN || 0, view.boxedFallAge || 99, tiltX * 0.45, tiltY * 0.45, close ? 36 : 15, close);
+    drawPhysical(ctx, crateIn, view.boxBalls, view.boxSpace, boxed, view.boxHidden || 0, type, time, tiltX * 0.45);
     ctx.restore();
     ctx.strokeStyle = "#d5dde4";
     ctx.lineWidth = 2;
