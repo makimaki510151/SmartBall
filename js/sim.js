@@ -112,7 +112,7 @@ function makePins(pockets) {
       if (Math.hypot(x - b.x, y - b.y) < b.r + 14) return;
     }
     for (const p of pins) {
-      if (Math.hypot(x - p.x, y - p.y) < 16) return;
+      if (Math.hypot(x - p.x, y - p.y) < 24) return;
     }
     pins.push({ x, y, r });
   };
@@ -139,15 +139,24 @@ function makePins(pockets) {
   add(458, 204, 5, true);
   add(448, 214, 4.6, true);
 
-  // 中央大穴の袖。入口は広く、遅い玉は落ちる。
-  add(228, 332, 5.2, true);
-  add(320, 332, 5.2, true);
-  add(220, 436, 5, true);
-  add(328, 436, 5, true);
+  // 中央大穴の袖。入口は残し、正面の釘でまっすぐを弾く。
+  add(220, 344, 5.2, true);
+  add(330, 344, 5.2, true);
+  add(214, 446, 5, true);
+  add(336, 446, 5, true);
+  add(300, 318, 5, true);
+  add(272, 248, 5, true);
+  add(258, 318, 5, true);
 
   // チャッカーの袖
   add(214, 150, 4.8, true);
   add(270, 150, 4.8, true);
+
+  // よく使う落ち筋の正面。当たると穴の外側へ弾く。
+  add(468, 198, 5, true);
+  add(446, 238, 5, true);
+  add(390, 268, 5, true);
+  add(186, 292, 5, true);
 
   // 中盤のまばらな釘
   const scatter = [
@@ -218,6 +227,9 @@ export function createState(seed) {
     guide: true,
     _pinCd: 0,
     _stuckT: 0,
+    _prevPower: null,
+    _sameRun: 0,
+    railSlip: 0,
     rand,
   };
 }
@@ -367,6 +379,17 @@ export function launch(state, power) {
   state.phase = "lane";
   state.launchPower = power;
   state.lastPower = power;
+  const prevPower = state._prevPower;
+  const repeated = prevPower != null && Math.abs(power - prevPower) < 0.05;
+  state._sameRun = repeated ? Math.min(5, (state._sameRun || 0) + 1) : 0;
+  state._prevPower = power;
+  if (repeated) {
+    const sign = state._sameRun % 2 === 1 ? 1 : -1;
+    const mag = Math.min(0.1, 0.03 + state._sameRun * 0.022);
+    state.railSlip = sign * mag + (state.rand() - 0.5) * 0.016;
+  } else {
+    state.railSlip = (state.rand() - 0.5) * 0.01;
+  }
   state.ball = {
     x: LANE_CX,
     y: 748 + power * 64,
@@ -389,7 +412,7 @@ export function launch(state, power) {
   state.lastChucker = false;
   state.lastDropX = null;
   state._stuckT = 0;
-  push(state, { type: "launch", power });
+  push(state, { type: "launch", power, sameRun: state._sameRun });
 
   if (state.stats.launches % 40 === 0) {
     const big = state.stats.launches % 200 === 0;
@@ -466,7 +489,7 @@ function stepLane(state, dt) {
     ball.y = join.y;
     state.phase = "rail";
     state.railS = 0;
-    state.railTarget = powerToS(state.launchPower);
+    state.railTarget = clamp(powerToS(state.launchPower) + (state.railSlip || 0), 0.14, 0.98);
     state.railV = 2.15 + state.launchPower * 0.35;
   }
 }
@@ -918,6 +941,39 @@ function runSelfTest() {
   console.log("dwell", worst.toFixed(2));
   if (worst > 0.85) {
     console.error("ball sat on the board");
+    process.exitCode = 1;
+  }
+
+  const repeat = createState(11);
+  repeat.stock = 8;
+  repeat.phase = "ready";
+  const drops = [];
+  for (let i = 0; i < 5; i += 1) {
+    if (!launch(repeat, 0.48).ok) break;
+    let guard = 0;
+    while (repeat.phase !== "ready" && repeat.phase !== "empty" && guard < 4000) {
+      step(repeat, 1 / 120);
+      guard += 1;
+    }
+    drops.push(Math.round(repeat.lastDropX));
+  }
+  const spread = Math.max(...drops) - Math.min(...drops);
+  console.log("repeat drops", drops.join(" "), "spread", spread);
+  if (drops.length < 5 || spread < 36) {
+    console.error("same power still lands together");
+    process.exitCode = 1;
+  }
+  let tight = 0;
+  const nails = createState(1).pins;
+  for (let i = 0; i < nails.length; i += 1) {
+    for (let j = i + 1; j < nails.length; j += 1) {
+      const gap = Math.hypot(nails[i].x - nails[j].x, nails[i].y - nails[j].y) - nails[i].r - nails[j].r;
+      if (gap < 12) tight += 1;
+    }
+  }
+  console.log("pins", nails.length, "tight", tight);
+  if (tight > 0) {
+    console.error("pins can trap a ball");
     process.exitCode = 1;
   }
 }

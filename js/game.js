@@ -367,6 +367,8 @@ export class Game {
     } else if (ev.type === "launch") {
       this.audio.play("launch");
       this.lifetime.launches += 1;
+      if (ev.sameRun === 1) this.say("同じ力だ。レールが滑って、落ち口がずれる。");
+      else if (ev.sameRun >= 2) this.say("同じ力を続けると、落ち口はさらに左右へずれる。");
     } else if (ev.type === "weak") {
       this.audio.play("weak");
       this.say("もう少し引いて。軽すぎると玉は出ない。");
@@ -709,6 +711,8 @@ export class Game {
     if (s.powerPreview >= 0.12) {
       const strength = s.powerPreview > 0.72 ? "強い" : s.powerPreview > 0.4 ? "中くらい" : "弱い";
       aimText = `引きは${strength}。離すと玉が出る。`;
+    } else if (s._sameRun > 0) {
+      aimText = "同じ力だと落ち口がずれる。引きを少し変えて。";
     } else if (s.lastPower) {
       aimText = "ゲージの白線は、前回引いた強さ。";
     }
