@@ -20,11 +20,11 @@
         <h1>スマートボール</h1>
         <p class="stars" id="stars" aria-label="獲得した星">☆☆☆☆☆☆</p>
       </div>
-      <div class="bulb-row"></div>
     </header>
 
     <div class="layout">
       <section class="machine">
+        <div class="stage">
         <p class="speech" id="speech" role="status">100円入れると、玉が25個おりてくる。</p>
         <div class="board-frame" id="frame">
           <canvas id="board" width="660" height="900" aria-label="スマートボールの盤面"></canvas>
@@ -32,7 +32,7 @@
           <div class="combo" id="combo" hidden>2 COMBO</div>
         </div>
         <div class="hopper">
-          <canvas id="hopper" width="640" height="220" aria-label="持ち玉の受け皿。クリックすると玉を眺められる"></canvas>
+          <canvas id="hopper" width="640" height="150" aria-label="持ち玉の受け皿。クリックすると玉を眺められる"></canvas>
         </div>
         <div class="tray">
           <div class="stock-readout">
@@ -47,6 +47,7 @@
             <button id="plead" type="button" hidden>店主のサービス</button>
           </div>
           <p class="aim-readout" id="aim">レバーを下に引いて、離す。</p>
+        </div>
         </div>
       </section>
 
@@ -100,7 +101,7 @@
     </div>
 
     <footer>
-      <p>Wikipediaの「スマートボール」にある、寝かせた盤面・100円25球・入賞の払い出し・連勝穴・役物・箱にしまう、を参考にした無料のゲームです。現金の賭けはなく、景品はブラウザ内のコレクションです。</p>
+      <p>寝かせた盤面の無料ゲームです。現金の賭けはなく、景品はブラウザ内のコレクションです。</p>
     </footer>
   </div>
   <div id="modal" class="modal" hidden></div>

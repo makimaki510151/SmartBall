@@ -11,6 +11,7 @@ import {
   step,
 } from "./sim.js";
 import { GAZE, HOPPER, render, renderGaze, renderHopper } from "./render.js";
+import { createTray, stepTray, syncTray } from "./tray.js";
 
 const SAVE_KEY = "smartball-yokomon-v1";
 
@@ -67,23 +68,27 @@ export class Game {
     this.ironUnlocked = false;
     this.coachSeen = false;
     this.spillWarned = false;
+    this.dish = createTray("dish");
+    this.boxTray = createTray("box");
     this.showcase = {
       loose: 0,
       boxed: 0,
       type: "glass",
-      looseFallN: 0,
-      looseFallAt: 0,
-      boxedFallN: 0,
-      boxedFallAt: 0,
       tiltX: 0,
       tiltY: 0,
+      dishBalls: this.dish.balls,
+      boxBalls: this.boxTray.balls,
+      dishSpace: { w: this.dish.w, h: this.dish.h },
+      boxSpace: { w: this.boxTray.w, h: this.boxTray.h },
+      dishHidden: 0,
+      boxHidden: 0,
     };
+    this._trayT = 0;
     this.gazeCanvas = null;
     this.gazeCtx = null;
     this.gazeTiltX = 0;
     this.gazeTiltY = 0;
     this.gazeDrag = false;
-    this._scReady = false;
     this.missionDirty = true;
     this.keyHold = false;
     this.acc = 0;
@@ -131,24 +136,8 @@ export class Game {
     const loose = Math.max(0, this.state.stock - this.state.boxedAt);
     const boxed = Math.max(0, Math.min(this.state.stock, this.state.boxedAt));
     const sc = this.showcase;
-    if (!this._scReady) {
-      this._scReady = true;
-    } else {
-      const dL = loose - sc.loose;
-      const dB = boxed - sc.boxed;
-      if (dL > 0) {
-        sc.looseFallN = Math.min(48, dL);
-        sc.looseFallAt = now;
-      } else if (dL < 0) {
-        sc.looseFallN = 0;
-      }
-      if (dB > 0) {
-        sc.boxedFallN = Math.min(48, dB);
-        sc.boxedFallAt = now;
-      } else if (dB < 0) {
-        sc.boxedFallN = 0;
-      }
-    }
+    const dt = this._trayT ? Math.min(0.05, (now - this._trayT) / 1000) : 0;
+    this._trayT = now;
     sc.loose = loose;
     sc.boxed = boxed;
     sc.type = this.state.ballType;
@@ -156,13 +145,22 @@ export class Game {
       this.gazeTiltX *= 0.9;
       this.gazeTiltY *= 0.9;
     }
-    const sway = this.gazeCtx && !this.gazeDrag ? Math.sin(now / 1000 * 0.75) * 0.22 : 0;
-    const tx = (this.gazeCtx ? this.gazeTiltX : 0) + sway;
+    const tx = this.gazeCtx ? this.gazeTiltX : 0;
     const ty = this.gazeCtx ? this.gazeTiltY : 0;
     sc.tiltX += (tx - sc.tiltX) * 0.18;
     sc.tiltY += (ty - sc.tiltY) * 0.18;
-    sc.looseFallAge = sc.looseFallAt ? (now - sc.looseFallAt) / 1000 : 99;
-    sc.boxedFallAge = sc.boxedFallAt ? (now - sc.boxedFallAt) / 1000 : 99;
+    syncTray(this.dish, loose);
+    syncTray(this.boxTray, boxed);
+    const gx = sc.tiltX * 1280;
+    const gy = 1180 + sc.tiltY * 420;
+    if (dt > 0) {
+      stepTray(this.dish, dt, gx, gy);
+      stepTray(this.boxTray, dt, gx * 0.45, gy);
+    }
+    sc.dishBalls = this.dish.balls;
+    sc.boxBalls = this.boxTray.balls;
+    sc.dishHidden = Math.max(0, loose - this.dish.balls.length);
+    sc.boxHidden = Math.max(0, boxed - this.boxTray.balls.length);
   }
 
   load() {

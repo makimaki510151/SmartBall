@@ -291,7 +291,37 @@ $("help").addEventListener("click", () => openModal("help", helpHtml(false)));
 $("prizes").addEventListener("click", () => openPrizes("prizes"));
 $("book").addEventListener("click", () => openPrizes("book"));
 
-window.addEventListener("resize", () => game.resize());
+function fitStage() {
+  const stage = document.querySelector(".stage");
+  const frame = document.getElementById("frame");
+  if (!stage || !frame) return;
+  let width = Math.max(240, Math.round(stage.parentElement.clientHeight * 0.62));
+  for (let i = 0; i < 5; i += 1) {
+    stage.style.width = `${width}px`;
+    const cs = getComputedStyle(frame);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const contentH = Math.max(80, frame.clientHeight - padY);
+    const next = Math.round(contentH * (660 / 900) + padX);
+    if (Math.abs(next - width) < 3) {
+      width = next;
+      break;
+    }
+    width = next;
+  }
+  const cap = Math.max(240, Math.round(window.innerWidth * 0.52));
+  stage.style.width = `${Math.max(240, Math.min(width, cap))}px`;
+}
+
+window.addEventListener("resize", () => {
+  game.resize();
+  fitStage();
+  requestAnimationFrame(fitStage);
+});
+requestAnimationFrame(() => {
+  fitStage();
+  requestAnimationFrame(fitStage);
+});
 syncAudioControls();
 game.start();
 
