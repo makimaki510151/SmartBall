@@ -30,6 +30,21 @@ export function ballSpec(type) {
   return { r: 9, catchBonus: 0, grav: 540, rest: 0.46, name: "ガラス玉" };
 }
 
+export function stepCharge(power, dir, dt) {
+  const rate = 1.15;
+  const sign = dir < 0 ? -1 : 1;
+  let next = power + dt * rate * sign;
+  let nextDir = sign;
+  if (next >= 1) {
+    next = 1;
+    nextDir = -1;
+  } else if (next <= 0) {
+    next = 0;
+    nextDir = 1;
+  }
+  return { power: next, dir: nextDir };
+}
+
 function makeRng(seed) {
   if (seed == null) return Math.random;
   let s = seed >>> 0 || 1;
@@ -981,6 +996,29 @@ function runSelfTest() {
       const gap = Math.hypot(nails[i].x - nails[j].x, nails[i].y - nails[j].y) - nails[i].r - nails[j].r;
       if (gap < 12) tight += 1;
     }
+  }
+  let charge = { power: 0, dir: 1 };
+  let sawTop = false;
+  let sawDown = false;
+  let sawBottom = false;
+  let sawUp = false;
+  for (let i = 0; i < 400; i += 1) {
+    const prev = charge.power;
+    charge = stepCharge(charge.power, charge.dir, 1 / 60);
+    if (charge.power < 0 || charge.power > 1) {
+      console.error("charge left the gauge", charge.power);
+      process.exitCode = 1;
+      break;
+    }
+    if (charge.power === 1) sawTop = true;
+    if (sawTop && charge.power < prev) sawDown = true;
+    if (sawDown && charge.power === 0) sawBottom = true;
+    if (sawBottom && charge.power > prev) sawUp = true;
+  }
+  console.log("charge bounce", sawTop, sawDown, sawBottom, sawUp, charge.power.toFixed(2));
+  if (!sawTop || !sawDown || !sawBottom || !sawUp) {
+    console.error("charge does not bounce at both ends");
+    process.exitCode = 1;
   }
   console.log("pins", nails.length, "tight", tight);
   if (tight > 0) {
