@@ -91,9 +91,54 @@ canvas.addEventListener("pointercancel", () => {
   game.state.powerPreview = 0;
 });
 
+const phoneQuery = window.matchMedia("(max-width: 820px), (max-height: 480px) and (max-width: 980px)");
+const panel = document.getElementById("panel");
+const menuBackdrop = $("menu-backdrop");
+
+function menuIsOpen() {
+  return panel.classList.contains("is-open");
+}
+
+function setMenu(open) {
+  panel.classList.toggle("is-open", open);
+  menuBackdrop.hidden = !open;
+  $("menu-open").setAttribute("aria-expanded", open ? "true" : "false");
+  panel.inert = phoneQuery.matches && !open;
+}
+
+function parkActions() {
+  const tray = document.querySelector(".tray-actions");
+  const park = $("panel-play");
+  const ids = ["repeat", "box", "gaze"];
+  if (phoneQuery.matches) {
+    for (const id of ids) park.appendChild($(id));
+  } else {
+    let after = $("coin");
+    for (const id of ids) {
+      after.after($(id));
+      after = $(id);
+    }
+  }
+  panel.inert = phoneQuery.matches && !menuIsOpen();
+}
+
+$("menu-open").addEventListener("click", () => setMenu(true));
+$("menu-close").addEventListener("click", () => setMenu(false));
+menuBackdrop.addEventListener("click", () => setMenu(false));
+phoneQuery.addEventListener("change", () => {
+  if (!phoneQuery.matches) setMenu(false);
+  parkActions();
+  fitStage();
+});
+
 let keyCharging = false;
 window.addEventListener("keydown", (event) => {
-  if (event.target instanceof HTMLInputElement) return;
+  if (event.target instanceof HTMLInputElement || event.target instanceof HTMLButtonElement) return;
+  if (event.code === "Escape" && menuIsOpen()) {
+    setMenu(false);
+    return;
+  }
+  if (menuIsOpen()) return;
   if (event.code === "Space" || event.code === "ArrowDown") {
     event.preventDefault();
     if (event.repeat || !modal.hidden) return;
@@ -164,6 +209,7 @@ function syncAudioControls() {
 }
 
 function openModal(kind, html) {
+  setMenu(false);
   const extra = kind === "gaze" ? " gaze-sheet" : kind === "story" ? " story-sheet" : "";
   modal.dataset.kind = kind;
   modal.innerHTML = `<div class="sheet${extra}" role="dialog" aria-modal="true">${html}</div>`;
@@ -331,6 +377,11 @@ function fitStage() {
     }
     width = next;
   }
+  const room = stage.parentElement.clientWidth;
+  if (phoneQuery.matches) {
+    stage.style.width = `${Math.max(160, room)}px`;
+    return;
+  }
   const cap = Math.max(240, Math.round(window.innerWidth * 0.52));
   stage.style.width = `${Math.max(240, Math.min(width, cap))}px`;
 }
@@ -340,6 +391,7 @@ window.addEventListener("resize", () => {
   fitStage();
   requestAnimationFrame(fitStage);
 });
+parkActions();
 requestAnimationFrame(() => {
   fitStage();
   requestAnimationFrame(fitStage);
