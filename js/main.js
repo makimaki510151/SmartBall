@@ -92,6 +92,7 @@ canvas.addEventListener("pointercancel", () => {
 });
 
 const phoneQuery = window.matchMedia("(max-width: 820px), (max-height: 480px) and (max-width: 980px)");
+const wideQuery = window.matchMedia("(min-width: 981px)");
 const panel = document.getElementById("panel");
 const menuBackdrop = $("menu-backdrop");
 
@@ -363,6 +364,11 @@ function fitStage() {
   const stage = document.querySelector(".stage");
   const frame = document.getElementById("frame");
   if (!stage || !frame) return;
+  const room = stage.parentElement.clientWidth;
+  if (phoneQuery.matches || wideQuery.matches) {
+    stage.style.width = `${Math.max(160, room)}px`;
+    return;
+  }
   let width = Math.max(240, Math.round(stage.parentElement.clientHeight * 0.62));
   for (let i = 0; i < 5; i += 1) {
     stage.style.width = `${width}px`;
@@ -376,11 +382,6 @@ function fitStage() {
       break;
     }
     width = next;
-  }
-  const room = stage.parentElement.clientWidth;
-  if (phoneQuery.matches) {
-    stage.style.width = `${Math.max(160, room)}px`;
-    return;
   }
   const cap = Math.max(240, Math.round(window.innerWidth * 0.52));
   stage.style.width = `${Math.max(240, Math.min(width, cap))}px`;
