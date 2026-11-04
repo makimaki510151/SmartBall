@@ -19,6 +19,7 @@
         <p class="eyebrow">昭和の横モノ</p>
         <h1>スマートボール</h1>
         <p class="stars" id="stars" aria-label="獲得した星">☆☆☆☆☆☆</p>
+        <button id="menu-open" class="menu-open" type="button" aria-expanded="false" aria-controls="panel">メニュー</button>
       </div>
     </header>
 
@@ -51,7 +52,14 @@
         </div>
       </section>
 
-      <aside class="panel">
+      <aside class="panel" id="panel">
+        <div class="panel-bar">
+          <h2>メニュー</h2>
+          <button id="menu-close" type="button">閉じる</button>
+        </div>
+        <div id="panel-play" class="panel-play">
+          <h2>操作</h2>
+        </div>
         <section>
           <h2>カウンター</h2>
           <dl class="stats">
@@ -95,6 +103,7 @@
           <button id="story" type="button">物語</button>
           <button id="reroll" type="button">台を入れ替える</button>
         </section>
+        <p class="panel-note">寝かせた盤面の無料ゲームです。現金の賭けはなく、帳面の話はこのブラウザの中だけです。</p>
       </aside>
     </div>
 
@@ -102,6 +111,7 @@
       <p>寝かせた盤面の無料ゲームです。現金の賭けはなく、帳面の話はこのブラウザの中だけです。</p>
     </footer>
   </div>
+  <div id="menu-backdrop" class="menu-backdrop" hidden></div>
   <div id="modal" class="modal" hidden></div>
   <script type="module" src="js/main.js"></script>
 </body>
