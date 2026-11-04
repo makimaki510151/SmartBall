@@ -5,6 +5,7 @@ import {
   insertCoin,
   launch,
   nextStar,
+  stepCharge,
   rerollTable,
   starCount,
   step,
@@ -280,7 +281,11 @@ export class Game {
       this.lastT = t;
       if (!this.paused) {
         if (this.keyHold && this.state.phase === "ready") {
-          this.state.powerPreview = Math.min(1, this.state.powerPreview + dt * 1.15);
+          const stepped = stepCharge(this.state.powerPreview, this._powerDir || 1, dt);
+          this.state.powerPreview = stepped.power;
+          this._powerDir = stepped.dir;
+        } else {
+          this._powerDir = 1;
         }
         this.acc += dt;
         let n = 0;
